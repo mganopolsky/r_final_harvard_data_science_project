@@ -77,7 +77,7 @@ just_the_sum <- train_set %>%
   group_by(movieId) %>% 
   summarize(s = sum(rating - mu), n_i = n())
 
-rmses <- sapply(lambdas, function(l){
+rmses_2 <- sapply(lambdas, function(l){
   predicted_ratings <- test_set %>% 
     left_join(just_the_sum, by='movieId') %>% 
     mutate(b_i = s/(n_i+l)) %>%
@@ -87,10 +87,10 @@ rmses <- sapply(lambdas, function(l){
 })
 #If you visually display the lambda's on a plot, you can spot the lowest point somewhere 
 # between 1.5 and 2
-qplot(lambdas, rmses)  
+qplot(lambdas, rmses_2)  
 #Saving the latest lambda 
-lambda <- lambdas[which.min(rmses)]
-lambda
+lambda_2 <- lambdas[which.min(rmses_2)]
+lambda_2
 
 #now that we know the best lambda is 2.45 - thia accounts for the smallest RMSE value - 
 # - we use that to make some predictions with regularization
@@ -98,7 +98,7 @@ lambda
 
 movie_reg_avgs <- train_set %>% 
   group_by(movieId) %>% 
-  summarize(b_i = sum(rating - mu)/(n()+lambda), n_i = n()) 
+  summarize(b_i = sum(rating - mu)/(n()+lambda_2), n_i = n()) 
 
 #To view the output of this we can plot it and see the difference regularization makes:
 tibble(original = movie_avgs$b_i, 
@@ -127,7 +127,7 @@ rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
 #the lambda needs to be selected using cross-validation, as well. We do this as follows, using the same lambda-creation sequence:
 lambdas <- seq(0, 10, 0.05)
 
-rmses <- sapply(lambdas, function(l){
+rmses_4 <- sapply(lambdas, function(l){
   
   mu <- mean(train_set$rating)
   
@@ -150,14 +150,14 @@ rmses <- sapply(lambdas, function(l){
   return(RMSE(predicted_ratings, test_set$rating))
 })
 #now we plot the new lambdas vs. RMSE's
-qplot(lambdas, rmses)  
+qplot(lambdas, rmses_4)  
 
 #we pick up the most accurate lambda - 
-lambda <- lambdas[which.min(rmses)]
-lambda
+lambda_4 <- lambdas[which.min(rmses_4)]
+lambda_4
 
 
-model_4_rmse <- min(rmses)
+model_4_rmse <- min(rmses_4)
 #This final outcome is .8642080, which is better then the requested 0.86490.
 tmp_rmse_results <- tibble(method = "Regularized Movie + User Effect Model", RMSE = model_4_rmse)
 
@@ -172,7 +172,7 @@ rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
 
 #l = 4.8
 
-rmses <- sapply(lambdas, function(l){
+rmses_5 <- sapply(lambdas, function(l){
   
   mu <- mean(train_set$rating)
   
@@ -204,14 +204,14 @@ rmses <- sapply(lambdas, function(l){
   return(RMSE(predicted_ratings, test_set$rating))
 })
 #now we plot the new lambdas vs. RMSE's
-qplot(lambdas, rmses, color="red", main="Regularized Lambdas Predicted With User Bias, Movie Bias, and Release Year Bias.")  
+qplot(lambdas, rmses_5, color="red", main="Regularized Lambdas Predicted With User Bias, Movie Bias, and Release Year Bias.")  
 
 #we pick up the most accurate lambda - 
-lambda <- lambdas[which.min(rmses)]
-lambda
+lambda_5 <- lambdas[which.min(rmses_5)]
+lambda_5
 
 
-model_5_rmse <- min(rmses)
+model_5_rmse <- min(rmses_5)
 tmp_rmse_results <- tibble(method = "Regularized Movie + User Effect Model + Year Effect Model", RMSE = model_5_rmse)
 
 #add to existing rmse results table
@@ -266,7 +266,7 @@ rmses_6 <- sapply(lambdas, function(l){
   return(RMSE(predicted_ratings, test_set$rating))
 })
 #now we plot the new lambdas vs. RMSE's
-qplot(lambdas, rmses_6, color="red", main="Regularized Lambdas Predicted With User Bias, Movie Bias, and Release Year Bias.")  
+qplot(lambdas, rmses_6, color="turquoise", main="Regularized Lambdas Predicted With User Bias, Movie Bias, and Release Year Bias.")  
 
 #we pick up the most accurate lambda - 
 lambda <- lambdas[which.min(rmses_6)]

@@ -45,6 +45,10 @@ movielens <- inner_join(ratings, movies, by = "movieId") %>%
          rating_year = year(rating_date))
 
 
+#separate the genres from the combined values into separate ones
+movielens <- movielens %>% separate_rows(genres, sep ="\\|")
+
+
 # Validation set will be 10% of MovieLens data
 set.seed(1, sample.kind="Rounding")
 # if using R 3.5 or earlier, use `set.seed(1)` instead
