@@ -61,5 +61,7 @@ validation <- temp %>%
 removed <- anti_join(temp, validation)
 edx <- rbind(edx, removed)
 
+#testing extra commits
+
 #remove all the objects from memory
 rm(dl, ratings, movies, test_index, temp, movielens, removed)
