@@ -10,7 +10,7 @@ toc: true
 number_sections: true
 toc_depth: 1
 df_print: kable
-fontsize: 12pt
+fontsize: 13pt
 ---
 
 ```{r setup, include=FALSE}

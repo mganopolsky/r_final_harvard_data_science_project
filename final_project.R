@@ -280,6 +280,7 @@ tmp_rmse_results <- tibble(method = "Regularized Movie + User Effect Model + Yea
 rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
 rm(tmp_rmse_results)
 
+#the results don't see to have made a huge difference in this case.
 
 # The final output 
 rmse_results %>% knitr::kable()
