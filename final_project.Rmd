@@ -21,28 +21,19 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Executive Summary
 
-This is Marina Ganopolsky's implementation of the **MovieLens Project** of the **HervardX: PH125.9x Data Science, Summer 2020: Capstone course**.
+This is Marina Ganopolsky's implementation of the **MovieLens Project** of the **HervardX: PH125.9x Data Science, Summer 2020: Capstone**.
 
 **The objectives of this project are:**
-* To create a movie recommendation engine based on the data set provided
+* To create a movie recommendation engine based on the data set provided by training a set of algorithm on provided wrangled training data
+* The engine will choose the best-performing algorithm, and make a final evaluation on the validation dataset 
 * Test the recommendations with the RMSE formula
-  + Find an **RMSE**  (Root Mean Square Error) of the predicted ratings, **ideally < 0.86490**, and validate this with the validation data set
+  + Find an **RMSE**  (Root Mean Square Error) of the predicted ratings, **ideally < 0.86490**, and validate this with the validation data set, as described below.
 
-The dataset is provided by the staff, and will be modified to better use during the assignment beyond the manipulations suggested in the assignment; the modifications will be shown in the **Data** section below. 
+The dataset is provided by the staff, and is wrangled by me for better use during the assignment beyond the manipulations suggested in the assignment; the modifications will be shown in the **Data** section below. 
 
-A quick summary of the data will be provided, but numerically and visually, in the **Data** section as well. This will inform us about the movies, users and general trends in the dataset. 
+A quick summary of the data wrangling modifications will be provided, as well as some visually representations of patterns present in the data in the **Data** section as well. This will inform the reader about the movies, users and general trends in the dataset. 
 
-An exploratory data analysis will be performed to generate predicted movie ratings, iteratively, until a final RMSE calculation fits our requirements. Results of the RMSE calculations will be analyzed and explained, and a conclusion will be provided.
-
-
-## Introduction
-
-Recommendation systems use ratings that users have given to items to make specific recommendations. Companies that sell many products to many customers and permit these customers to rate their products, like Amazon, are able to collect massive datasets that can be used to predict what rating a particular user will give to a specific item. Items for which a high rating is predicted for a given user are then recommended to that user. 
-
-The same could be done for other items, as movies for instance in our case. Recommendation systems are one of the most used models in machine learning algorithms. In fact the success of Netflix is said to be based on its strong recommendation system. The Netflix prize (open competition for the best collaborative filtering algorithm to predict user ratings for films, based on previous ratings without any other information about the users or films), in fact, represent the high importance of algorithm for products recommendation system.
-
-For this project we will focus on create a movie recommendation system using the 10M version of MovieLens dataset, collected by GroupLens Research.
-
+An exploratory analysis will be performed to generate predicted movie ratings, with various models, to be specified, until a final RMSE calculation fits our requirements. Results of the RMSE calculations will be analyzed and explained, and a conclusion will be provided.
 
 ## Aim of the project
 
@@ -71,10 +62,23 @@ The MovieLens dataset is automatically downloaded with the code provided by the 
 
 • [MovieLens 10M dataset - zip file] http://files.grouplens.org/datasets/movielens/ml-10m.zip
 
-As specified by the project description (and the provided code, )
+As specified by the project description (and the provided code) the data is split into a validation set and the "rest". I further split the data, after it was manipulated, into a testing and training sets; The calculations and algorithm verifications are done on the testing and training sets, and after the final RMSE is chosen, this algorithm is applied to the validation test to verify the hypothesis.
+
 A fair amount of data manipulation has been done to the datasets created with the provided code. The changes include:
-
-
+* Extracting the release year of the movie from its title. (Every movie title seems to include the release year in at the end of title, surrounded by parentheses.)
+  + The field **release_year** is created with a ReGex ```{r eval=FALSE} "(\\(\\d{4}\\)$)" ```
+* Removing the year from the movie title
+* Removing the parentheses from the **release_year** and converting it to a numerical field
+* Creating a field called **rating_date** , by extracting the rating date from the **timestamp** field
+* Creating a field called **age_of_movie**, by subtracting the year the film was released from the year parameter of the current date, acquired by ```{r eval=FALSE} year(as_date(Sys.Date()))```
+* Creating a field called **rating_year** by extracting the rating year from the **rating_date** field.
+* As provided, the film genres are provided as a string separated by "|". Therefor, I further manipulate the movielens dataset (and significantly increase its size) by extracting out the film genres, with the following code:
+```{r eval=FALSE} movielens <- movielens %>% separate_rows(genres, sep ="\\|")```
+* After the data wrangling is complete, the dataset is split up into :
+  + **A validation set**, comprised of **10%** of the data complete data
+    + this portion of the data shall not to be analyzed until the final RMSE is found to be within acceptable range 
+  + **A testing dataset**
+  + **A training dataset**
 
 In order to predict in the most possible accurate way the movie rating of the users that haven’t seen the movie yet, the he MovieLens dataset will be splitted into 2 subsets that will be the “edx”, a training subset to train the algorithm, and “validation” a subset to test the movie ratings.  
 

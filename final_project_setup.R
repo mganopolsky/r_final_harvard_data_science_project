@@ -19,7 +19,12 @@ library(lubridate)
 # http://files.grouplens.org/datasets/movielens/ml-10m.zip
 
 dl <- tempfile()
-download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
+
+#if file.exists("ml-10m.zip") {
+#  download.file("ml-10m.zip", dl)
+#} else {
+  download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
+#}
 
 ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
                  col.names = c("userId", "movieId", "rating", "timestamp"))
@@ -48,6 +53,8 @@ movielens <- inner_join(ratings, movies, by = "movieId") %>%
 #separate the genres from the combined values into separate ones
 movielens <- movielens %>% separate_rows(genres, sep ="\\|")
 
+#Before separating the dataset into test, train and validation data, we provide some visualuzation for the report to get a better view of the data
+
 
 # Validation set will be 10% of MovieLens data
 set.seed(1, sample.kind="Rounding")
@@ -68,4 +75,9 @@ edx <- rbind(edx, removed)
 #testing extra commits
 
 #remove all the objects from memory
-rm(dl, ratings, movies, test_index, temp, movielens, removed)
+rm(dl, ratings, movies, test_index, temp, removed) #, movielens, )
+
+#Let's show the movie ratings by genre
+#qqplot()
+
+

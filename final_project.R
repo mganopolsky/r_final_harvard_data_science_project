@@ -269,8 +269,8 @@ rmses_6 <- sapply(lambdas, function(l){
 qplot(lambdas, rmses_6, color="turquoise", main="Regularized Lambdas Predicted With User Bias, Movie Bias, and Release Year Bias.")  
 
 #we pick up the most accurate lambda - 
-lambda <- lambdas[which.min(rmses_6)]
-lambda
+lambda_6 <- lambdas[which.min(rmses_6)]
+lambda_6
 
 
 model_6_rmse <- min(rmses_6)
@@ -280,7 +280,50 @@ tmp_rmse_results <- tibble(method = "Regularized Movie + User Effect Model + Yea
 rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
 rm(tmp_rmse_results)
 
-#the results don't see to have made a huge difference in this case.
+#the results don't see to have made a huge difference in this case. but the numbers are below the expected RMSE number, so we will try to apply this algorithm to the validation data
+mu <- mean(train_set$rating)
+
+b_i <- train_set %>% 
+  group_by(movieId) %>%
+  summarize(b_i = sum(rating - mu)/(n()+lambda_6))
+
+b_u <- train_set %>% 
+  left_join(b_i, by="movieId") %>%
+  group_by(userId) %>%
+  summarize(b_u = sum(rating - b_i - mu)/(n()+lambda_6))
+
+b_y <- train_set %>% 
+  left_join(b_i, by='movieId') %>%
+  left_join(b_u, by="userId") %>%
+  group_by(age_of_movie) %>%
+  summarize(b_y = sum(rating - b_i - b_u - mu)/(n()+lambda_6))
+
+#adding in the genre bias here
+b_g <- train_set %>% 
+  left_join(b_i, by='movieId') %>%
+  left_join(b_u, by="userId") %>%
+  left_join(b_y, by="age_of_movie") %>%
+  group_by(genres) %>%
+  summarize( b_g = sum(rating - b_i - b_u - b_y - mu)/(n()+lambda_6))
+
+
+predicted_ratings <- 
+  validation %>% 
+  left_join(b_i, by = "movieId") %>%
+  left_join(b_u, by = "userId") %>%
+  left_join(b_y, by = "age_of_movie") %>%
+  left_join(b_g, by = "genres") %>%
+  mutate(pred = mu + b_i + b_u + b_y + b_g) %>%
+  pull(pred)
+
+  final_rmse <- RMSE(predicted_ratings, validation$rating)
+
+tmp_rmse_results <- tibble(method = "Final Evaluation of the algorithm on the Validation Data", RMSE = final_rmse)
+  
+  #add to existing rmse results table
+rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
+rm(tmp_rmse_results)
+  
 
 # The final output 
 rmse_results %>% knitr::kable()
