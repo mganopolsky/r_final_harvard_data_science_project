@@ -20,11 +20,7 @@ library(lubridate)
 
 dl <- tempfile()
 
-#if file.exists("ml-10m.zip") {
-#  download.file("ml-10m.zip", dl)
-#} else {
-  download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
-#}
+download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
 
 ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
                  col.names = c("userId", "movieId", "rating", "timestamp"))
@@ -71,8 +67,6 @@ validation <- temp %>%
 # Add rows removed from validation set back into edx set
 removed <- anti_join(temp, validation)
 edx <- rbind(edx, removed)
-
-#testing extra commits
 
 #remove all the objects from memory
 rm(dl, ratings, movies, test_index, temp, removed) #, movielens, )
