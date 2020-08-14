@@ -65,6 +65,7 @@ The MovieLens dataset is automatically downloaded with the code provided by the 
 As specified by the project description (and the provided code) the data is split into a validation set and the "rest". I further split the data, after it was manipulated, into a testing and training sets; The calculations and algorithm verifications are done on the testing and training sets, and after the final RMSE is chosen, this algorithm is applied to the validation test to verify the hypothesis.
 
 A fair amount of data manipulation has been done to the datasets created with the provided code. The changes include:
+* Adding a ratings average per movie in **avg_rating**
 * Extracting the release year of the movie from its title. (Every movie title seems to include the release year in at the end of title, surrounded by parentheses.)
   + The field **release_year** is created with a ReGex ```{r eval=FALSE} "(\\(\\d{4}\\)$)" ```
 * Removing the year from the movie title
@@ -80,7 +81,7 @@ A fair amount of data manipulation has been done to the datasets created with th
   + **A testing dataset**
   + **A training dataset**
 
-In order to predict in the most possible accurate way the movie rating of the users that haven’t seen the movie yet, the he MovieLens dataset will be splitted into 2 subsets that will be the “edx”, a training subset to train the algorithm, and “validation” a subset to test the movie ratings.  
+In order to predict in the most accurate way the movie rating of the users that haven’t seen the movie yet, the he MovieLens dataset will be splitted into 2 subsets that will be the “edx”, a training subset to train the algorithm, and “validation” a subset to test the movie ratings.  
 
 ```{r, echo = FALSE, message = FALSE, warning = FALSE, eval = TRUE}
 if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")

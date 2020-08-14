@@ -7,6 +7,7 @@
 if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
 if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
 if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+if(!require(hexbin)) install.packages("hexbin", repos = "http://cran.us.r-project.org")
 
 library(tidyverse)
 library(caret)
@@ -51,6 +52,12 @@ movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
   mutate(release_year = as.numeric(str_remove(str_remove(release_year, "[\\(]"), "[\\)]")) ,
          title = str_trim(str_remove(title, "\\(\\d{4}\\)$")))
 
+#add in ratings average per movie
+rating_avgs <- ratings %>% group_by(movieId) %>% summarise(avg_rating = mean(rating))
+
+ratings <- inner_join(ratings, rating_avgs, by = "movieId")
+
+
 # add the date field , converting the timestamp to an actual date, and rounding to the nearest day
 #use inner_join instead of provided left_join to make sure the movie titles and genres are populated
 movielens <- inner_join(ratings, movies, by = "movieId") %>% 
@@ -58,11 +65,91 @@ movielens <- inner_join(ratings, movies, by = "movieId") %>%
          age_of_movie =  year(as_date(Sys.Date())) - release_year,
          rating_year = year(rating_date))
 
+#Before splitting the data into individual rows per genre, I will make some data visualization procedures in order 
+#to draw some conclusions. First, there are currently this amount of ratings in the dataset:
+nrow(movielens)
+
+#We check to see how many unique movies and users we have in the system
+data_summary <- movielens %>% summarize(n_users = n_distinct(userId), n_movies = n_distinct(movieId))
+
+data_summary
+
+#If every user rated every movie, we would have approximately data_summary$n_users X data_summary$n_movies entries in the dataset; however, as shown above, we only have 
+#However, the data set is actually less then 1.4% populated, which we can see from the following calculation:
+nrow(movielens)/(data_summary$n_users* data_summary$n_movies)
+
+#Visually, we can show the sparseness with the following image graph:
+users <- sample(unique(movielens$userId), 100)
+rafalib::mypar()
+movielens %>% filter(userId %in% users) %>% 
+  select(userId, movieId, rating) %>%
+  mutate(rating = 1) %>%
+  spread(movieId, rating) %>% select(sample(ncol(.), 100)) %>% 
+  as.matrix() %>% t(.) %>%
+  image(1:100, 1:100,. , xlab="Movies", ylab="Users", col="blue")
+abline(h=0:100+0.5, v=0:100+0.5, col = "grey")
+
+
+#now we plot out a histogram of users to examine how many ratings per user exists in our system 
+users <- movielens %>% group_by(userId) %>% summarize(n = n())
+
+#Summarizing the users in the system, we have users with a minimum of 20 reviews; however, the maximum is 7359 reviews per user
+users %>% summarise( max(n), min(n))
+
+#Viewing the ratings' density distribution, it is obvious that most of the ratings come from a small percentage of users
+users %>%
+  ggplot(aes(n)) + 
+  geom_density(fill = "blue", color="black") + 
+  scale_x_log10() + 
+  ggtitle("Users log10 Density Distribution")
+
+#We can also show that each movie is not rated as many times - the popular movies will be seen by many more people and will therefor be rated by many more people
+#Meanwhile, there are also many indpeendant films that will only be seen by a few people and therefore will only be rated by a small percentage of those.
+movielens %>%  group_by(movieId) %>% summarise(n = n()) %>%
+  ggplot(aes(n)) + 
+  geom_histogram(fill = "blue", color="black", bins = 40) +
+  scale_x_log10() + 
+  ggtitle("Movie Ratings With log10 Density Distribution")
+
+bigger_films <- movielens %>% group_by(movieId) %>% summarise(n = n()) %>% filter(n > 20)
+
+#The users set came with a spceifications that only users with 20 or more reviews are included; however, no such specification was done for movies; I believe that movies that have only a few reviews may very well be outliers and so should be excluded from the database.
+movielens <- subset(movielens, (movieId %in% bigger_films$movieId))
+
+#In terms of ratings, we can that the ratings are on a scale of 0-5, in increments of 0.5. There are 10 discrete options, and the ratings are not continous.
+
+types_of_ratings <- sort(unique(movielens$rating))
+#Graph a bar graph of the distribution of the ratings. Full-grade ratings are much more common then the half-grades
+movielens %>% group_by(rating) %>% summarize(count = n()) %>% ggplot(aes(rating, count)) + geom_bar(stat="identity", fill="maroon", color="black") + xlab("Movie Rating") + 
+  ylab("Rating Count") + ggtitle("Movie Ratings Summary")
+
+#Plotting release year vs avg movie ratings - it seems movies are either getting worse with time, or the reviewers are getting pickier.
+movielens %>%
+  ggplot(aes(release_year, avg_rating)) + stat_bin_hex(bins = 100) + scale_fill_distiller(palette = "PuBuGn") +
+  stat_smooth(method = "lm", color = "magenta", size = 1) +
+  ylab("Average Movie Rating") + xlab("Release Year") + ggtitle("Release Year vs Average Movie Ratings")
+
+
+ratings_summary_by_movie <- ratings %>% group_by(movieId) %>% summarise(n = n()) 
+ratings_summary_by_movie
+
+
 
 #separate the genres from the combined values into separate ones
 movielens <- movielens %>% separate_rows(genres, sep ="\\|")
 
-#Before separating the dataset into test, train and validation data, we provide some visualuzation for the report to get a better view of the data
+#We will now evaluate how many genres are present.
+genres <- unique(movielens$genres)
+genres
+
+#I would like to examine the patterns of movie reviews by genre; Do people tend to review certain genres more then others?
+movies_by_genre <- movielens %>% group_by(genres) %>% summarize(count = n()) %>% arrange(count)
+movies_by_genre %>% 
+  mutate(genres = factor(genres, levels = unique(as.character(genres)))) %>%
+  ggplot(aes(x = genres, y= count, fill=count)) + geom_bar( stat = "identity" ) + scale_y_log10() + coord_flip() +
+  ggtitle("Total Reviews By Genre") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) 
+  
+#The answer seems to be a resounding YES! Drama seems to have the most reviews, while IMAX has by far the least; this pattern makes sense, since only a small percentage of movies gets released in IMAX (although the ones that are are super popular, and will thus get more reviews.)
 
 
 # Validation set will be 10% of MovieLens data
@@ -175,7 +262,7 @@ find_generic_lambda <- function(seq_start, seq_end, seq_increment, FUN, detailed
   if (detailed_flag)
   {
     #if this is the first iteration of the function, continue with taking a 10% lower and 10% higher lambda value to iterate through new lambdas that are much more granuluar, with increments at 10% of what they were previously.
-    new_lambda_range = (seq_end - seq_start)/10
+    new_lambda_range = (seq_end - seq_start)/20
     print("new lamdbda ramge is:")
     print(new_lambda_range)
     min_lambda_first_try <- find_generic_lambda(seq_start = min_lambda_first_try - new_lambda_range, seq_end = min_lambda_first_try + new_lambda_range, 
@@ -378,7 +465,7 @@ model_6_lambda <- find_generic_lambda(seq_start=0, seq_end=10, seq_increment=0.5
                                       FUN= function(x) regularized_movie_and_user_and_year_and_genre(x, training_set=train_set, testing_set=test_set ), 
                                       detailed_flag = TRUE, training_set=train_set, testing_set=test_set)
 
-model_6_rmse <- regularized_movie_and_user_and_year(model_6_lambda, train_set, test_set)
+model_6_rmse <- regularized_movie_and_user_and_year_and_genre(model_6_lambda, train_set, test_set)
 
 tmp_rmse_results <- tibble(method = "Regularized Movie + User Effect Model + Year Effect Model + Genre Effect Model", RMSE = model_6_rmse)
 
@@ -388,8 +475,6 @@ rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
 rm(tmp_rmse_results)
 
 
-
-#the results don't see to have made a huge difference in this case. but the numbers are below the expected RMSE number, so we will try to apply this algorithm to the validation data
 final_rmse <- regularized_movie_and_user_and_year(model_6_lambda, train_set, validation)
 
 tmp_rmse_results <- tibble(method = "Final Model Tested on Validation Set", RMSE = final_rmse)
