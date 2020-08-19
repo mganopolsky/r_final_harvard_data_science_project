@@ -14,6 +14,7 @@ library(caret)
 library(data.table)
 library(stringr)
 library(lubridate)
+library(ggrepel)
 
 # MovieLens 10M dataset:
 # https://grouplens.org/datasets/movielens/10m/
@@ -43,7 +44,7 @@ movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::",
 colnames(movies) <- c("movieId", "title", "genres")
 
 # if using R 4.0 or later
-#mutate to add the "year" column, and remove the (year) pattern from the title 
+#mutate to add the "release_year" column, format it as a numeric, and remove the (year) pattern from the title 
 
 movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
                                            title = as.character(title),
@@ -56,7 +57,6 @@ movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
 rating_avgs <- ratings %>% group_by(movieId) %>% summarise(avg_rating = mean(rating))
 
 ratings <- inner_join(ratings, rating_avgs, by = "movieId")
-
 
 # add the date field , converting the timestamp to an actual date, and rounding to the nearest day
 #use inner_join instead of provided left_join to make sure the movie titles and genres are populated
@@ -74,11 +74,12 @@ data_summary <- movielens %>% summarize(n_users = n_distinct(userId), n_movies =
 
 data_summary
 
-#If every user rated every movie, we would have approximately data_summary$n_users X data_summary$n_movies entries in the dataset; however, as shown above, we only have 
+#If every user rated every movie, we would have approximately data_summary$n_users X data_summary$n_movies entries in the dataset; 
+#however, as shown above, we only have nrow(movielens) ratings.
 #However, the data set is actually less then 1.4% populated, which we can see from the following calculation:
 nrow(movielens)/(data_summary$n_users* data_summary$n_movies)
 
-#Visually, we can show the sparseness with the following image graph:
+#Visually, we can show the sparseness on a small sample of the data, with the following image graph:
 users <- sample(unique(movielens$userId), 100)
 rafalib::mypar()
 movielens %>% filter(userId %in% users) %>% 
@@ -93,7 +94,7 @@ abline(h=0:100+0.5, v=0:100+0.5, col = "grey")
 #now we plot out a histogram of users to examine how many ratings per user exists in our system 
 users <- movielens %>% group_by(userId) %>% summarize(n = n())
 
-#Summarizing the users in the system, we have users with a minimum of 20 reviews; however, the maximum is 7359 reviews per user
+#Summarizing the users in the system, we have users with a minimum of 20 reviews; however, the maximum is over 7000 reviews per user
 users %>% summarise( max(n), min(n))
 
 #Viewing the ratings' density distribution, it is obvious that most of the ratings come from a small percentage of users
@@ -111,17 +112,19 @@ movielens %>%  group_by(movieId) %>% summarise(n = n()) %>%
   scale_x_log10() + 
   ggtitle("Movie Ratings With log10 Density Distribution")
 
-bigger_films <- movielens %>% group_by(movieId) %>% summarise(n = n()) %>% filter(n > 20)
-
-#The users set came with a spceifications that only users with 20 or more reviews are included; however, no such specification was done for movies; I believe that movies that have only a few reviews may very well be outliers and so should be excluded from the database.
+#The users set came with a spceifications that only users with 20 or more reviews are included; however, no such specification was done for movies; 
+#I believe that movies that have only a few reviews may very well be outliers and so should be excluded from the database.
+#Therefor, below, we include only the films with more then 20 reviews.
+bigger_films <- movielens %>% group_by(movieId) %>% summarise(n = n()) %>% filter(n > 50)
 movielens <- subset(movielens, (movieId %in% bigger_films$movieId))
 
-#In terms of ratings, we can that the ratings are on a scale of 0-5, in increments of 0.5. There are 10 discrete options, and the ratings are not continous.
-
+#Next we examine the ratings system. In terms of ratings, we can that the ratings are on a scale of 0-5, in increments of 0.5. There are 10 discrete options, and the ratings are not continous.
 types_of_ratings <- sort(unique(movielens$rating))
-#Graph a bar graph of the distribution of the ratings. Full-grade ratings are much more common then the half-grades
-movielens %>% group_by(rating) %>% summarize(count = n()) %>% ggplot(aes(rating, count)) + geom_bar(stat="identity", fill="maroon", color="black") + xlab("Movie Rating") + 
-  ylab("Rating Count") + ggtitle("Movie Ratings Summary")
+movielens %>% group_by(rating) %>% summarize(count = n()) %>% ggplot(aes(rating, count)) + geom_bar(stat="identity", fill="maroon", color="black") + 
+  xlab("Movie Rating") + ylab("Rating Count") + ggtitle("Movie Ratings Summary")
+#From the data and the bar graph of the ratings, we can make one 2 conclusions: 
+#(1) In terms of ratings, we can that the ratings are on a scale of 0.5-5, in increments of 0.5. There are 10 discrete options, and the ratings are not continous.
+#(2) Full-grade ratings are much more common then the half-grades
 
 #Plotting release year vs avg movie ratings - it seems movies are either getting worse with time, or the reviewers are getting pickier.
 movielens %>%
@@ -129,14 +132,32 @@ movielens %>%
   stat_smooth(method = "lm", color = "magenta", size = 1) +
   ylab("Average Movie Rating") + xlab("Release Year") + ggtitle("Release Year vs Average Movie Ratings")
 
+movielens %>%
+  ggplot(aes(release_year, avg_rating)) + stat_bin_hex(bins = 100) + scale_fill_distiller(palette = "PuBuGn") +
+  stat_smooth(method = "lm", color = "magenta", size = 1) +
+  ylab("Average Movie Rating") + xlab("Release Year") + ggtitle("Release Year vs Average Movie Ratings")
 
-ratings_summary_by_movie <- ratings %>% group_by(movieId) %>% summarise(n = n()) 
-ratings_summary_by_movie
+
+#next, we'll explore how to movies have faired over time by Genre.
+#Based on the information, it is fairly obvious that most of the average ratings across genres have declined over the years. The notable exception to this is IMAX movies, and in a small way, animation. These trends make sense, as both IMAX and animated films have benefited greatly from technological advancements over the years.
+#The notable exception to those are IMAX mocies 
+movielens %>% na.omit() %>% separate_rows(genres, sep = "\\|") %>%
+  ggplot(aes(release_year, avg_rating)) + stat_bin_hex(bins = 100) + #scale_fill_distiller(palette = "PuBuGn") +
+  stat_smooth(method = "lm", color = "magenta", size = 1) +
+  #geom_smooth(aes(group=genres, color=genres)) + 
+  ylab("Average Movie Rating") + xlab("Release Year") + ggtitle("Release Year vs Average Movie Ratings") +
+  facet_wrap(~genres) + theme(axis.text.x = element_text(angle = 90))     
 
 
 
 #separate the genres from the combined values into separate ones
 movielens <- movielens %>% separate_rows(genres, sep ="\\|")
+
+
+#movielens %>%
+#  ggplot(aes(release_year, rating)) + geom_point() + 
+#  facet_grid(genres ~ rating) + ggtitle("Release Year vs Average Movie Ratings By Genre")
+
 
 #We will now evaluate how many genres are present.
 genres <- unique(movielens$genres)
@@ -151,10 +172,19 @@ movies_by_genre %>%
   
 #The answer seems to be a resounding YES! Drama seems to have the most reviews, while IMAX has by far the least; this pattern makes sense, since only a small percentage of movies gets released in IMAX (although the ones that are are super popular, and will thus get more reviews.)
 
+ratings_summary_by_genre <- movielens %>% group_by(genres) %>% summarise(avg_rating = mean(rating)) 
+ratings_summary_by_genre %>% ggplot(aes(genres, avg_rating, size = 3, col=genres)) + 
+  geom_point() +   theme(axis.title.x=element_blank(), legend.title = element_blank(),
+                         axis.text.x=element_blank(), legend.key= element_blank(),
+                         axis.ticks.x=element_blank(), legend.text = element_blank(), legend.position="none") +
+  geom_label_repel(aes(label = genres),
+                   box.padding   = 0.35, 
+                   point.padding = 0.5,
+                   segment.color = "blue") + ggtitle("Average Rating By Genre") + ylab("Average Rating")
+
 
 # Validation set will be 10% of MovieLens data
 set.seed(1, sample.kind="Rounding")
-# if using R 3.5 or earlier, use `set.seed(1)` instead
 test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
 edx <- movielens[-test_index,]
 temp <- movielens[test_index,]
@@ -168,12 +198,9 @@ validation <- temp %>%
 removed <- anti_join(temp, validation)
 edx <- rbind(edx, removed)
 
+#TODO: remove the movielens object as well 
 #remove all the objects from memory
 rm(dl, ratings, movies, test_index, temp, removed) #, movielens, )
-
-#Let's show the movie ratings by genre
-#qqplot() 
-
 
 #adjusted the RMSE function to account for NA and Null values
 RMSE <- function(true_ratings, predicted_ratings){
@@ -190,6 +217,7 @@ test_set <- edx[test_index,]
 mu_hat <- mean(train_set$rating)
 mu_hat
 
+#we will run the RMSE algorithm on the test set, and compare it with the mean of the ratings. This is the most basic of predictions, and will give us a baseline to beat.
 naive_rmse <- RMSE(test_set$rating, mu_hat)
 naive_rmse
 
@@ -222,6 +250,7 @@ tmp_rmse_results <- tibble(method = "Just Movie Effect Model b_i average", RMSE 
 #add to existing rmse results table
 rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
 
+#Now we will add in the user bias, b_u
 user_avgs <- train_set %>% 
   left_join(movie_avgs, by='movieId') %>%
   group_by(userId) %>%
@@ -241,9 +270,8 @@ tmp_rmse_results <- tibble(method = "User Affect + Movie Effect Model", RMSE = m
 #add to existing rmse results table
 rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
 
-
-rm(tmp_rmse_results)
-
+#Next we will attempt to improve the algorithms with regularization.
+#For this purpose, we will calculate a range of lambda values, and pick the smallest one in order to calculate the lowest RMSE
 
 #function that will create the loose labmdas, and then come up with a more detailed lambda evaluation when we have an idea where the lowest value is
 find_generic_lambda <- function(seq_start, seq_end, seq_increment, FUN, detailed_flag = FALSE, training_set, testing_set)
@@ -262,7 +290,7 @@ find_generic_lambda <- function(seq_start, seq_end, seq_increment, FUN, detailed
   if (detailed_flag)
   {
     #if this is the first iteration of the function, continue with taking a 10% lower and 10% higher lambda value to iterate through new lambdas that are much more granuluar, with increments at 10% of what they were previously.
-    new_lambda_range = (seq_end - seq_start)/20
+    new_lambda_range = (seq_end - seq_start)/40
     print("new lamdbda ramge is:")
     print(new_lambda_range)
     min_lambda_first_try <- find_generic_lambda(seq_start = min_lambda_first_try - new_lambda_range, seq_end = min_lambda_first_try + new_lambda_range, 

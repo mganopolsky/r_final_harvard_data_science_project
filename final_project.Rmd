@@ -69,6 +69,7 @@ A fair amount of data manipulation has been done to the datasets created with th
 * Extracting the release year of the movie from its title. (Every movie title seems to include the release year in at the end of title, surrounded by parentheses.)
   + The field **release_year** is created with a ReGex ```{r eval=FALSE} "(\\(\\d{4}\\)$)" ```
 * Removing the year from the movie title
+* Removing films with **less then 20 reviews** - this shows to have made a slight difference over using the data as-is.
 * Removing the parentheses from the **release_year** and converting it to a numerical field
 * Creating a field called **rating_date** , by extracting the rating date from the **timestamp** field
 * Creating a field called **age_of_movie**, by subtracting the year the film was released from the year parameter of the current date, acquired by ```{r eval=FALSE} year(as_date(Sys.Date()))```
@@ -81,12 +82,13 @@ A fair amount of data manipulation has been done to the datasets created with th
   + **A testing dataset**
   + **A training dataset**
 
-In order to predict in the most accurate way the movie rating of the users that haven’t seen the movie yet, the he MovieLens dataset will be splitted into 2 subsets that will be the “edx”, a training subset to train the algorithm, and “validation” a subset to test the movie ratings.  
+In order to predict in the most accurate way the movie rating of the users that haven’t seen the movie yet, the he MovieLens dataset will be splitted into 2 subsets that will be the “edx”, a training subset to train the algorithm, and “validation” a subset to test the movie ratings. The validation subset will not be evaluated until a final algorithm has been chosen , and checked for validation.
 
 ```{r, echo = FALSE, message = FALSE, warning = FALSE, eval = TRUE}
 if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
 if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
 if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+if(!require(hexbin)) install.packages("hexbin", repos = "http://cran.us.r-project.org")
 
 library(tidyverse)
 library(caret)
@@ -131,16 +133,18 @@ movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
   mutate(release_year = as.numeric(str_remove(str_remove(release_year, "[\\(]"), "[\\)]")) ,
          title = str_trim(str_remove(title, "\\(\\d{4}\\)$")))
 
+#add in ratings average per movie
+rating_avgs <- ratings %>% group_by(movieId) %>% summarise(avg_rating = mean(rating))
+
+ratings <- inner_join(ratings, rating_avgs, by = "movieId")
+
+
 # add the date field , converting the timestamp to an actual date, and rounding to the nearest day
 #use inner_join instead of provided left_join to make sure the movie titles and genres are populated
 movielens <- inner_join(ratings, movies, by = "movieId") %>% 
   mutate(rating_date = round_date(as_datetime(timestamp), unit="day"),
          age_of_movie =  year(as_date(Sys.Date())) - release_year,
          rating_year = year(rating_date))
-
-
-#separate the genres from the combined values into separate ones
-movielens <- movielens %>% separate_rows(genres, sep ="\\|")
 
 ```
 
