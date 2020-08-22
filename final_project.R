@@ -8,6 +8,9 @@ if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-
 if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
 if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
 if(!require(hexbin)) install.packages("hexbin", repos = "http://cran.us.r-project.org")
+if(!require(stringr)) install.packages("hexbin", repos = "http://cran.us.r-project.org")
+if(!require(lubridate)) install.packages("hexbin", repos = "http://cran.us.r-project.org")
+if(!require(ggrepel)) install.packages("hexbin", repos = "http://cran.us.r-project.org")
 
 library(tidyverse)
 library(caret)
@@ -65,6 +68,10 @@ movielens <- inner_join(ratings, movies, by = "movieId") %>%
          age_of_movie =  year(as_date(Sys.Date())) - release_year,
          rating_year = year(rating_date))
 
+
+#Are there any missing values? 
+summary(movielens)
+
 #Before splitting the data into individual rows per genre, I will make some data visualization procedures in order 
 #to draw some conclusions. First, there are currently this amount of ratings in the dataset:
 nrow(movielens)
@@ -114,14 +121,19 @@ movielens %>%  group_by(movieId) %>% summarise(n = n()) %>%
 
 #The users set came with a spceifications that only users with 20 or more reviews are included; however, no such specification was done for movies; 
 #I believe that movies that have only a few reviews may very well be outliers and so should be excluded from the database.
-#Therefor, below, we include only the films with more then 20 reviews.
-bigger_films <- movielens %>% group_by(movieId) %>% summarise(n = n()) %>% filter(n > 50)
+#Therefor, below, we include only the films with more then 100 reviews.
+bigger_films <- movielens %>% group_by(movieId) %>% summarise(n = n()) %>% filter(n > 100)
 movielens <- subset(movielens, (movieId %in% bigger_films$movieId))
 
 #Next we examine the ratings system. In terms of ratings, we can that the ratings are on a scale of 0-5, in increments of 0.5. There are 10 discrete options, and the ratings are not continous.
 types_of_ratings <- sort(unique(movielens$rating))
-movielens %>% group_by(rating) %>% summarize(count = n()) %>% ggplot(aes(rating, count)) + geom_bar(stat="identity", fill="maroon", color="black") + 
-  xlab("Movie Rating") + ylab("Rating Count") + ggtitle("Movie Ratings Summary")
+
+movielens %>%
+  ggplot(aes(rating)) +  xlab("Movie Rating") + ylab("Cumulative Rating Count") +
+  geom_histogram(binwidth = 0.25, fill = "blue") +
+  scale_y_continuous(breaks = c(seq(0, 3000000, 500000))) +
+  ggtitle("Rating Distribution")
+
 #From the data and the bar graph of the ratings, we can make one 2 conclusions: 
 #(1) In terms of ratings, we can that the ratings are on a scale of 0.5-5, in increments of 0.5. There are 10 discrete options, and the ratings are not continous.
 #(2) Full-grade ratings are much more common then the half-grades
@@ -131,12 +143,6 @@ movielens %>%
   ggplot(aes(release_year, avg_rating)) + stat_bin_hex(bins = 100) + scale_fill_distiller(palette = "PuBuGn") +
   stat_smooth(method = "lm", color = "magenta", size = 1) +
   ylab("Average Movie Rating") + xlab("Release Year") + ggtitle("Release Year vs Average Movie Ratings")
-
-movielens %>%
-  ggplot(aes(release_year, avg_rating)) + stat_bin_hex(bins = 100) + scale_fill_distiller(palette = "PuBuGn") +
-  stat_smooth(method = "lm", color = "magenta", size = 1) +
-  ylab("Average Movie Rating") + xlab("Release Year") + ggtitle("Release Year vs Average Movie Ratings")
-
 
 #next, we'll explore how to movies have faired over time by Genre.
 #Based on the information, it is fairly obvious that most of the average ratings across genres have declined over the years. The notable exception to this is IMAX movies, and in a small way, animation. These trends make sense, as both IMAX and animated films have benefited greatly from technological advancements over the years.
@@ -154,22 +160,22 @@ movielens %>% na.omit() %>% separate_rows(genres, sep = "\\|") %>%
 movielens <- movielens %>% separate_rows(genres, sep ="\\|")
 
 
-#movielens %>%
-#  ggplot(aes(release_year, rating)) + geom_point() + 
-#  facet_grid(genres ~ rating) + ggtitle("Release Year vs Average Movie Ratings By Genre")
-
-
 #We will now evaluate how many genres are present.
 genres <- unique(movielens$genres)
 genres
 
 #I would like to examine the patterns of movie reviews by genre; Do people tend to review certain genres more then others?
 movies_by_genre <- movielens %>% group_by(genres) %>% summarize(count = n()) %>% arrange(count)
+
+
 movies_by_genre %>% 
   mutate(genres = factor(genres, levels = unique(as.character(genres)))) %>%
-  ggplot(aes(x = genres, y= count, fill=count)) + geom_bar( stat = "identity" ) + scale_y_log10() + coord_flip() +
-  ggtitle("Total Reviews By Genre") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) 
-  
+  ggplot(aes(x = genres, y= count, fill=count)) + geom_bar( stat = "identity" ) +  
+  scale_y_continuous(n.breaks = 5, breaks = c(0,  1000000, 2000000, 3000000, 4000000), labels = c("0", "1,000,000", "2,000,000", "3,000,000", "4,000,000")) +
+  coord_flip() +
+  ggtitle("Total Reviews By Genre") + theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) 
+
+
 #The answer seems to be a resounding YES! Drama seems to have the most reviews, while IMAX has by far the least; this pattern makes sense, since only a small percentage of movies gets released in IMAX (although the ones that are are super popular, and will thus get more reviews.)
 
 ratings_summary_by_genre <- movielens %>% group_by(genres) %>% summarise(avg_rating = mean(rating)) 
@@ -204,7 +210,7 @@ rm(dl, ratings, movies, test_index, temp, removed) #, movielens, )
 
 #adjusted the RMSE function to account for NA and Null values
 RMSE <- function(true_ratings, predicted_ratings){
-  sqrt(mean((true_ratings - predicted_ratings)^2,  na.rm = TRUE))
+  sqrt(mean((true_ratings - predicted_ratings)^2))
 }
 
 #splitting the edx data set into testing and training , making sure to exclude the validation data created before.
@@ -274,27 +280,27 @@ rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
 #For this purpose, we will calculate a range of lambda values, and pick the smallest one in order to calculate the lowest RMSE
 
 #function that will create the loose labmdas, and then come up with a more detailed lambda evaluation when we have an idea where the lowest value is
-find_generic_lambda <- function(seq_start, seq_end, seq_increment, FUN, detailed_flag = FALSE, training_set, testing_set)
+find_generic_lambda <- function(seq_start, seq_end, seq_increment, FUN, detailed_flag = FALSE, training_set, testing_set, plot_title="")
 {
   lambdas <- seq(seq_start, seq_end, seq_increment)
-  print("lambdas")
-  print(lambdas)
+  #print("lambdas")
+  #print(lambdas)
   RMSE <- sapply(lambdas, FUN)
   #find the smallest lamdba
-  print(qplot(lambdas, RMSE))
+  print(qplot(lambdas, RMSE, main=plot_title))
   #saving the first round lambda 
   min_lambda_first_try <- lambdas[which.min(RMSE)]
-  print("rough lamdbda is:")
-  print(min_lambda_first_try)
+  #print("rough lamdbda is:")
+  #print(min_lambda_first_try)
   
   if (detailed_flag)
   {
     #if this is the first iteration of the function, continue with taking a 10% lower and 10% higher lambda value to iterate through new lambdas that are much more granuluar, with increments at 10% of what they were previously.
     new_lambda_range = (seq_end - seq_start)/40
-    print("new lamdbda ramge is:")
-    print(new_lambda_range)
+    #print("new lamdbda ramge is:")
+    #print(new_lambda_range)
     min_lambda_first_try <- find_generic_lambda(seq_start = min_lambda_first_try - new_lambda_range, seq_end = min_lambda_first_try + new_lambda_range, 
-                                                seq_increment = seq_increment/10, FUN, detailed_flag = FALSE, training_set = training_set, testing_set = testing_set)
+                                                seq_increment = seq_increment/10, FUN, detailed_flag = FALSE, training_set = training_set, testing_set = testing_set, plot_title=plot_title)
   }
   return (min_lambda_first_try)
   
@@ -305,7 +311,7 @@ find_generic_lambda <- function(seq_start, seq_end, seq_increment, FUN, detailed
 
 regularized_rmse_3 <- function(l, training_set, testing_set)
 {
-  print(l)
+  #print(l)
   mu <- mean(training_set$rating)
   just_the_sum <- training_set %>% 
     group_by(movieId) %>% 
@@ -318,14 +324,14 @@ regularized_rmse_3 <- function(l, training_set, testing_set)
     pull(pred)
     
     l_rmse <- RMSE(predicted_ratings, testing_set$rating)
-    print(l_rmse)
+    #print(l_rmse)
     return (l_rmse)
 }
 
 #testing out the regularization with lamdba - 
-rmse3_lambda <- find_generic_lambda(seq_start=0, seq_end=10, seq_increment=0.5, 
+rmse3_lambda <- find_generic_lambda(seq_start=-2, seq_end=10, seq_increment=0.5, 
                                     FUN= function(x) regularized_rmse_3(x, train_set, test_set ), 
-                                    detailed_flag = TRUE, training_set=train_set, testing_set=test_set)
+                                    detailed_flag = TRUE, training_set=train_set, testing_set=test_set, plot_title = "Testing Lambdas for Movie Affect")
 
 rmse_3 <- regularized_rmse_3(rmse3_lambda, train_set, test_set)
 
@@ -343,7 +349,7 @@ rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
 regularized_movie_and_user <- function(l, training_set, testing_set)
 {
   
-  print(l)
+  #print(l)
   mu <- mean(training_set$rating)
   
   b_i <- training_set %>% 
@@ -368,7 +374,7 @@ regularized_movie_and_user <- function(l, training_set, testing_set)
 
 rmse4_lambda <- find_generic_lambda(seq_start=0, seq_end=10, seq_increment=0.5, 
                                     FUN= function(x) regularized_movie_and_user(x, training_set=train_set, testing_set=test_set ), 
-                                    detailed_flag = TRUE, training_set=train_set, testing_set=test_set)
+                                    detailed_flag = TRUE, training_set=train_set, testing_set=test_set, plot_title = "Testing Lambdas for Movie Affect and User Bias Effect")
 
 rmse_4 <- regularized_movie_and_user(rmse4_lambda, train_set, test_set)
 
@@ -385,7 +391,7 @@ rmse_results
 regularized_movie_and_user_and_year <- function(l, training_set, testing_set)
 {
   mu <- mean(training_set$rating)
-  print(l)
+  #print(l)
   
   b_i <- training_set %>% 
     group_by(movieId) %>%
@@ -411,21 +417,13 @@ regularized_movie_and_user_and_year <- function(l, training_set, testing_set)
     pull(pred)
  
   rmse <- RMSE(predicted_ratings, testing_set$rating)
-  print(rmse) 
+  #print(rmse) 
   return(rmse)
 }
-#now we plot the new lambdas vs. RMSE's
-#qplot(lambdas, rmses_5, color="red", main="Regularized Lambdas Predicted With User Bias, Movie Bias, and Release Year Bias.")  
 
-#we pick up the most accurate lambda - 
-#lambda_5 <- lambdas[which.min(rmses_5)]
-#lambda_5
-
-
-#model_5_rmse <- min(rmses_5)
 model_5_lamdba <- find_generic_lambda(seq_start=0, seq_end=10, seq_increment=0.5, 
                                     FUN= function(x) regularized_movie_and_user_and_year(x, training_set=train_set, testing_set=test_set ), 
-                                    detailed_flag = TRUE, training_set=train_set, testing_set=test_set)
+                                    detailed_flag = TRUE, training_set=train_set, testing_set=test_set, plot_title = "Testing Lambdas for Movie Affect, User Bias Effect and Film Age Affect")
 
 model_5_rmse <- regularized_movie_and_user_and_year(model_5_lamdba, train_set, test_set)
 
@@ -479,7 +477,7 @@ regularized_movie_and_user_and_year_and_genre <- function(l, training_set, testi
     pull(pred)
   
   rmse <- RMSE(predicted_ratings, testing_set$rating)
-  print(rmse)
+  #print(rmse)
   return(rmse)
 }
 #now we plot the new lambdas vs. RMSE's
@@ -491,7 +489,7 @@ regularized_movie_and_user_and_year_and_genre <- function(l, training_set, testi
 
 model_6_lambda <- find_generic_lambda(seq_start=0, seq_end=10, seq_increment=0.5, 
                                       FUN= function(x) regularized_movie_and_user_and_year_and_genre(x, training_set=train_set, testing_set=test_set ), 
-                                      detailed_flag = TRUE, training_set=train_set, testing_set=test_set)
+                                      detailed_flag = TRUE, training_set=train_set, testing_set=test_set, plot_title = "Testing Lambdas for Movie Affect, User Bias , Film Age And Genre Effect")
 
 model_6_rmse <- regularized_movie_and_user_and_year_and_genre(model_6_lambda, train_set, test_set)
 

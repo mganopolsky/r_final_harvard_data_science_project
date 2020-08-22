@@ -1,7 +1,7 @@
 ---
 title: "PH125.9x Data Science Capstone Final Movie Project Report"
 author: "Marina Ganopolsky"
-date: "8/6/2020"
+date: "8/20/2020"
 output: 
   pdf_document:
     latex_engine: xelatex
@@ -29,52 +29,51 @@ This is Marina Ganopolsky's implementation of the **MovieLens Project** of the *
 * Test the recommendations with the RMSE formula
   + Find an **RMSE**  (Root Mean Square Error) of the predicted ratings, **ideally < 0.86490**, and validate this with the validation data set, as described below.
 
-The dataset is provided by the staff, and is wrangled by me for better use during the assignment beyond the manipulations suggested in the assignment; the modifications will be shown in the **Data** section below. 
+The dataset is provided by the staff, and is wrangled in the project for better use during the assignment beyond the manipulations suggested in the assignment; the modifications will be shown in the **Data** section below. 
 
-A quick summary of the data wrangling modifications will be provided, as well as some visually representations of patterns present in the data in the **Data** section as well. This will inform the reader about the movies, users and general trends in the dataset. 
+A quick summary of the data wrangling modifications will be provided, as well as some visual representations of patterns present in the data, in the **Data** section. This will inform the reader about the movie trends, user trends and general trends in the dataset. 
 
 An exploratory analysis will be performed to generate predicted movie ratings, with various models, to be specified, until a final RMSE calculation fits our requirements. Results of the RMSE calculations will be analyzed and explained, and a conclusion will be provided.
 
 ## Aim of the project
 
-The aim in this project is to train a machine learning algorithm that predicts user ratings (from 0.5 to 5 stars) using the inputs of a provided subset  (edx dataset provided by the staff) to predict movie ratings in a provided validation set.
+The aim of this project is to train a machine learning algorithm that predicts user ratings using the inputs of a provided subset  (edx dataset provided by the staff) to predict movie ratings in a provided validation set.
 
-The value used to evaluate algorithm performance is the Root Mean Square Error, or RMSE. RMSE is one of the most used measure of the differences between values predicted by a model and the values observed. RMSE is a measure of accuracy, to compare forecasting errors of different models for a particular dataset, a lower RMSE is better than a higher one. The effect of each error on RMSE is proportional to the size of the squared error; thus larger errors have a disproportionately large effect on RMSE. Consequently, RMSE is sensitive to outliers.
-Four models that will be developed will be compared using their resulting RMSE in order to assess their quality. The evaluation criteria for this algorithm is a RMSE expected to be lower than 0.8775.
+The function used to evaluate algorithm performance is the **Root Mean Square Error**, or RMSE. RMSE is one of the most frequently used measures of the differences between values predicted by a model and the values observed. RMSE is a measure of accuracy, and a lower RMSE is better than a higher one. The effect of each error on RMSE is proportional to the size of the squared error; thus larger errors have a disproportionately large effect on RMSE. Because of this, the RMSE algorithm is sensitive to outliers. With this in consideration, I have massaged the data some more, **removing films that have less then 100 reviews**. At the end of this document, in an addendum, I will present my findings for a variety of levels of movie reviews I have set levels for, from 0 to 1000. 
+Six (6) models that will be developed, tested and compared using the resulting RMSE in order to assess their quality. The ideal evaluation criteria for this project, as specified by the assignment, is a RMSE that is expected to be lower than **0.86490**.
 The function that computes the RMSE for vectors of ratings and their corresponding predictors will be the following:
 $$ RMSE = \sqrt{\frac{1}{N}\displaystyle\sum_{u,i} (\hat{y}_{u,i}-y_{u,i})^{2}} $$
+The code version in R looks as follows:
 
-```{r RMSE_function1, echo = FALSE}
+```{r RMSE_function1, echo = FALSE, eval = FALSE}
 RMSE <- function(predicted_ratings, true_ratings){
   sqrt(mean((predicted_ratings - true_ratings)^2))
 }
 ```
 
-
-Finally, the best resulting model will be used to predict the movie ratings.
-
+After evaluating every available algorthm I have come up with, the best-resulting model, run through the RMSE above, will be used on the validation dataset to evaluate the quality of the predictions of the movie ratings.
 
 ## Dataset
 
-The MovieLens dataset is automatically downloaded with the code provided by the staff; in the interests of brevity I will not be including the code here. The datasets are also provided, and can be additionaly downloaded here:
+The MovieLens dataset is automatically downloaded with the code provided by the staff; The datasets can be additionaly downloaded here:
 
 • [MovieLens 10M dataset]  https://grouplens.org/datasets/movielens/10m/
 
 • [MovieLens 10M dataset - zip file] http://files.grouplens.org/datasets/movielens/ml-10m.zip
 
-As specified by the project description (and the provided code) the data is split into a validation set and the "rest". I further split the data, after it was manipulated, into a testing and training sets; The calculations and algorithm verifications are done on the testing and training sets, and after the final RMSE is chosen, this algorithm is applied to the validation test to verify the hypothesis.
+As specified by the project description (and the provided code) the data is split into a validation set and the "rest". I further split the data, after it was manipulated, into a **testing** and **training** sets, so as to evaluate the quality of the predictions as I search for the appropriate algorithm; The calculations and algorithm verifications are done on the testing and training sets, and after the final RMSE is chosen, this algorithm is applied to the validation test to verify the hypothesis.
 
 A fair amount of data manipulation has been done to the datasets created with the provided code. The changes include:
 * Adding a ratings average per movie in **avg_rating**
 * Extracting the release year of the movie from its title. (Every movie title seems to include the release year in at the end of title, surrounded by parentheses.)
   + The field **release_year** is created with a ReGex ```{r eval=FALSE} "(\\(\\d{4}\\)$)" ```
 * Removing the year from the movie title
-* Removing films with **less then 20 reviews** - this shows to have made a slight difference over using the data as-is.
+* Removing films with **100 reviews or less** - this shows to have made a slight difference over using the data as-is.
 * Removing the parentheses from the **release_year** and converting it to a numerical field
 * Creating a field called **rating_date** , by extracting the rating date from the **timestamp** field
 * Creating a field called **age_of_movie**, by subtracting the year the film was released from the year parameter of the current date, acquired by ```{r eval=FALSE} year(as_date(Sys.Date()))```
 * Creating a field called **rating_year** by extracting the rating year from the **rating_date** field.
-* As provided, the film genres are provided as a string separated by "|". Therefor, I further manipulate the movielens dataset (and significantly increase its size) by extracting out the film genres, with the following code:
+* As provided, the film genres are provided as a string separated by "|". Therefor, I further manipulate the movielens dataset (and significantly increase its size) by extracting out the film genres, and creating a line per film, per genre, with the following code:
 ```{r eval=FALSE} movielens <- movielens %>% separate_rows(genres, sep ="\\|")```
 * After the data wrangling is complete, the dataset is split up into :
   + **A validation set**, comprised of **10%** of the data complete data
@@ -85,16 +84,21 @@ A fair amount of data manipulation has been done to the datasets created with th
 In order to predict in the most accurate way the movie rating of the users that haven’t seen the movie yet, the he MovieLens dataset will be splitted into 2 subsets that will be the “edx”, a training subset to train the algorithm, and “validation” a subset to test the movie ratings. The validation subset will not be evaluated until a final algorithm has been chosen , and checked for validation.
 
 ```{r, echo = FALSE, message = FALSE, warning = FALSE, eval = TRUE}
+
 if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
 if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
 if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
 if(!require(hexbin)) install.packages("hexbin", repos = "http://cran.us.r-project.org")
+if(!require(stringr)) install.packages("hexbin", repos = "http://cran.us.r-project.org")
+if(!require(lubridate)) install.packages("hexbin", repos = "http://cran.us.r-project.org")
+if(!require(ggrepel)) install.packages("hexbin", repos = "http://cran.us.r-project.org")
 
 library(tidyverse)
 library(caret)
 library(data.table)
 library(stringr)
 library(lubridate)
+library(ggrepel)
 
 # MovieLens 10M dataset:
 # https://grouplens.org/datasets/movielens/10m/
@@ -124,7 +128,7 @@ movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::",
 colnames(movies) <- c("movieId", "title", "genres")
 
 # if using R 4.0 or later
-#mutate to add the "year" column, and remove the (year) pattern from the title 
+#mutate to add the "release_year" column, format it as a numeric, and remove the (year) pattern from the title 
 
 movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
                                            title = as.character(title),
@@ -137,7 +141,6 @@ movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
 rating_avgs <- ratings %>% group_by(movieId) %>% summarise(avg_rating = mean(rating))
 
 ratings <- inner_join(ratings, rating_avgs, by = "movieId")
-
 
 # add the date field , converting the timestamp to an actual date, and rounding to the nearest day
 #use inner_join instead of provided left_join to make sure the movie titles and genres are populated
@@ -157,39 +160,155 @@ Algorithm development is to be carried out on the "edx" subset only, as "validat
 
 ## Data Analysis
 
-To get familiar with the dataset, we find the first rows of "edx" subset as below.
-The subset contain the six variables “userID”, “movieID”, “rating”, “timestamp”, “title”, and “genres”. Each row represent a single rating of a user for a single movie.
+As a first step, in order to get some basic information about the data we're working with, we examine the ```edx``` variable.
+The subset contain the six variables “userID”, “movieID”, “rating”, “timestamp”, “title”, and “genres”. These fields were originally present in the dataset. After I have massaged it a bit, the following fields were added, as derived from the existing fields : avg_rating, release_year, rating_date, age_of_movie, and rating_year. Per row, this is a representation of one user's rating of a single movie. As you can tell, the genres per film are currently combined into "|"-delimited string, which we will later separate.
 
 ```{r head, echo = FALSE}
-head(edx) %>%
+str(movielens)
+head(movielens) %>%
   print.data.frame()
-  
 ```
 
 A summary of the subset confirms that there are no missing values.
 
 ```{r summary, echo = FALSE}
-summary(edx)
+summary(movielens)
 ```
 
-The total of unique movies and users in the edx subset is about 70.000 unique users and about 10.700 different movies:
+The total of unique movies and users in the edx subset is about 70,000 unique users and about 10,700 different movies:
 
 ```{r, echo = FALSE}
-edx %>%
-summarize(n_users = n_distinct(userId), 
-          n_movies = n_distinct(movieId))
+data_summary <- movielens %>% summarize(n_users = n_distinct(userId), n_movies = n_distinct(movieId))
+
+data_summary
 ```
 
-Users have a preference to rate movies rather higher than lower as shown by the distribution of ratings below. 4 is the most common rating, followed by 3 and 5. 0.5 is the least common rating. In general, half rating are less common than whole star ratings.
+Before splitting the data into individual rows per genre, I will conduct some data visualization in order to draw some conclusions. First, there are currently this many of rows in the dataset:
 
-```{r rating_distribution, echo = FALSE}
-edx %>%
-  ggplot(aes(rating)) +
-  geom_histogram(binwidth = 0.25, color = "black") +
-  scale_x_discrete(limits = c(seq(0.5,5,0.5))) +
+```{r, echo = FALSE}
+nrow(movielens)
+```
+
+
+If every user rated every movie, we would have approximately ```{r, echo = FALSE} data_summary$n_users X data_summary$n_movies``` entries in the dataset; however, as shown above, we only have ```{r, echo = FALSE} nrow(movielens)``` ratings.
+However, the data set is actually less then 1.4% populated, which we can see from the following calculation:
+
+```{r, echo = FALSE} nrow(movielens)/(data_summary$n_users* data_summary$n_movies)```
+
+
+Visually, we can show the sparseness on a small sample of the data, with the following image graph:
+```{r, echo = FALSE} 
+users <- sample(unique(movielens$userId), 100)
+rafalib::mypar()
+movielens %>% filter(userId %in% users) %>% 
+  select(userId, movieId, rating) %>%
+  mutate(rating = 1) %>%
+  spread(movieId, rating) %>% select(sample(ncol(.), 100)) %>% 
+  as.matrix() %>% t(.) %>%
+  image(1:100, 1:100,. , xlab="Movies", ylab="Users", col="blue")
+abline(h=0:100+0.5, v=0:100+0.5, col = "grey")
+```
+
+
+We continue with our analysis of the users in the dataset. First, we plot out a histogram of users to examine how many ratings per user exists in our system. Summarizing the users in the system, we have users with a minimum of 20 reviews; however, the maximum is over 7000 reviews per user.
+
+```{r, echo = FALSE} 
+users <- movielens %>% group_by(userId) %>% summarize(n = n())
+users %>% summarise( max(n), min(n))
+```
+
+
+Viewing the ratings' density distribution, it is obvious that most of the ratings come from a small percentage of users:
+```{r, echo = FALSE} 
+users %>%
+  ggplot(aes(n)) + 
+  geom_density(fill = "blue", color="black") + 
+  scale_x_log10() + 
+  ggtitle("Users log10 Density Distribution")
+```
+
+
+We can also show that each movie is not rated as many times - the popular movies will be seen by many more people and will therefor be rated by many more people. Meanwhile, there are also many independant films that will only be seen by a few people and therefor will only be rated by a small percentage of those.
+```{r, echo = FALSE} 
+movielens %>%  group_by(movieId) %>% summarise(n = n()) %>%
+  ggplot(aes(n)) + 
+  geom_histogram(fill = "blue", color="black", bins = 40) +
+  scale_x_log10() + 
+  ggtitle("Movie Ratings With log10 Density Distribution")
+```
+
+The users set came with a spceifications that only users with 20 or more reviews are included; however, no such specification was done for movies; I believe that movies that have only a few reviews may very well be outliers and so should be excluded from the database. Therefor, below, we include only the films with more then 100 reviews.
+```{r, echo = FALSE} 
+bigger_films <- movielens %>% group_by(movieId) %>% summarise(n = n()) %>% filter(n > 100)
+movielens <- subset(movielens, (movieId %in% bigger_films$movieId))
+```
+Next we examine the ratings system. In terms of ratings, we can that the ratings are on a scale of 0-5, in increments of 0.5. There are 10 discrete options, and the ratings are not continous.
+
+```{r  echo = FALSE}
+movielens %>%
+  ggplot(aes(rating)) +  xlab("Movie Rating") + ylab("Cumulative Rating Count") +
+  geom_histogram(binwidth = 0.25, fill = "blue") +
   scale_y_continuous(breaks = c(seq(0, 3000000, 500000))) +
   ggtitle("Rating distribution")
-  
+
+
+```
+From the data and the bar graph of the ratings, we can make one 3 conclusions: 
+1. In terms of ratings, we can that the ratings are on a scale of 0.5-5, in increments of 0.5. There are 10 discrete options, and the ratings are **not** continous.
+2. Full-grade ratings are much more common then the half-grades
+3. 4 is the most common rating
+
+Plotting release year vs avg movie ratings - it seems movies are either getting worse with time, or the reviewers are getting pickier.
+```{r  echo = TRUE}
+movielens %>%
+  ggplot(aes(release_year, avg_rating)) + stat_bin_hex(bins = 100) + scale_fill_distiller(palette = "PuBuGn") +
+  stat_smooth(method = "lm", color = "magenta", size = 1) +
+  ylab("Average Movie Rating") + xlab("Release Year") + ggtitle("Release Year vs Average Movie Ratings")
+```
+
+
+Next, we'll explore how to movies have faired over time by **genre**. Based on the information, it is fairly obvious that most of the average ratings across genres have declined over the years. The notable exception to this is IMAX movies, and in a small way, animation. These trends make sense, as both IMAX and animated films have benefited greatly from technological advancements over the years.
+
+```{r  echo = FALSE}
+movielens %>% na.omit() %>% separate_rows(genres, sep = "\\|") %>%
+  ggplot(aes(release_year, avg_rating)) + stat_bin_hex(bins = 100) + #scale_fill_distiller(palette = "PuBuGn") +
+  stat_smooth(method = "lm", color = "magenta", size = 1) +
+  #geom_smooth(aes(group=genres, color=genres)) + 
+  ylab("Average Movie Rating") + xlab("Release Year") + ggtitle("Release Year vs Average Movie Ratings") +
+  facet_wrap(~genres) + theme(axis.text.x = element_text(angle = 90))     
+```
+Next in the data wrangling process, I will separate the genres from the combined values into separate genres, one entry per rating, per movie, per genre. 
+We can now view the unique genres available in the system:
+```{r  echo = FALSE}
+movielens <- movielens %>% separate_rows(genres, sep ="\\|")
+genres <- unique(movielens$genres)
+print(genres)
+```
+Do people tend to review certain genres more then others?
+```{r  echo = FALSE}
+movies_by_genre <- movielens %>% group_by(genres) %>% summarize(count = n()) %>% arrange(count)
+
+movies_by_genre %>% 
+  mutate(genres = factor(genres, levels = unique(as.character(genres)))) %>%
+  ggplot(aes(x = genres, y= count, fill=count)) + geom_bar( stat = "identity" ) +  
+  scale_y_continuous(n.breaks = 5, breaks = c(0,  1000000, 2000000, 3000000, 4000000), labels = c("0", "1,000,000", "2,000,000", "3,000,000", "4,000,000")) +
+  coord_flip() +
+  ggtitle("Total Reviews By Genre") + theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) 
+
+```
+The answer seems to be a resounding YES! Dramas seems to have the most reviews, while IMAX has by far the least; this pattern makes sense, since only a small percentage of movies gets released in IMAX (although the ones that are are super popular, and will thus get more reviews.)
+
+In general, the average rating by genre can be shown on this plot; **Film Noir** seems to have the highest average rating, while **Horror** films have the lowest. 
+```{r  echo = FALSE}
+ratings_summary_by_genre <- movielens %>% group_by(genres) %>% summarise(avg_rating = mean(rating)) 
+ratings_summary_by_genre %>% ggplot(aes(genres, avg_rating, size = 3, col=genres)) + 
+  geom_point() +   theme(axis.title.x=element_blank(), legend.title = element_blank(),
+                         axis.text.x=element_blank(), legend.key= element_blank(),
+                         axis.ticks.x=element_blank(), legend.text = element_blank(), legend.position="none") +
+  geom_label_repel(aes(label = genres),
+                   box.padding   = 0.35, 
+                   point.padding = 0.5,
+                   segment.color = "blue") + ggtitle("Average Rating By Genre") + ylab("Average Rating")
 ```
 
 
@@ -199,7 +318,7 @@ Thus regularisation and a penalty term will be applied to the models in this pro
 
 
 ```{r number_of_ratings_per_movie, echo = TRUE, fig.height=4, fig.width=5}
-edx %>%
+movielens %>%
 count(movieId) %>%
 ggplot(aes(n)) +
 geom_histogram(bins = 30, color = "black") +
@@ -214,7 +333,7 @@ As 20 movies that were rated only once appear to be obscure, predictions of futu
 
 
 ```{r obscure_movies, echo = TRUE, fig.height=4, fig.width=5}
-edx %>%
+movielens %>%
   group_by(movieId) %>%
   summarize(count = n()) %>%
   filter(count == 1) %>%
@@ -231,7 +350,7 @@ We can observe that the majority of users have rated between 30 and 100 movies. 
 
 
 ```{r number_ratings_given_by_users, echo = TRUE, fig.height=4, fig.width=5}
-edx %>%
+movielens %>%
 count(userId) %>%
 ggplot(aes(n)) +
 geom_histogram(bins = 30, color = "black") +
@@ -246,7 +365,7 @@ Furthermore, users differ vastly in how critical they are with their ratings. So
 
 
 ```{r Mean_movie_ratings_given_by_users, echo = TRUE, fig.height=4, fig.width=5}
-edx %>%
+movielens %>%
   group_by(userId) %>%
   filter(n() >= 100) %>%
   summarize(b_u = mean(rating)) %>%
@@ -270,8 +389,7 @@ $$ RMSE = \sqrt{\frac{1}{N}\displaystyle\sum_{u,i} (\hat{y}_{u,i}-y_{u,i})^{2}} 
 
 with N being the number of user/movie combinations and the sum occurring over all these combinations.
 The RMSE is our measure of model accuracy.
-We can interpret the RMSE similarly to a standard deviation: it is the typical error we make when predicting a movie rating. If its result is larger than 1, it means that our typical error is larger than one star, which is not a good result.
-The written function to compute the RMSE for vectors of ratings and their corresponding predictions is:
+We can interpret the RMSE similarly to a standard deviation: it is the typical error we make when predicting a movie rating. If its result is larger than 1, it means that our typical error is larger than one star, which is not a good result. The written function to compute the RMSE for vectors of ratings and their corresponding predictions is:
 
 
 ```{r RMSE_function2, echo = TRUE}
