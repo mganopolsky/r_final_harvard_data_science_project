@@ -230,6 +230,7 @@ naive_rmse
 #adding the basic results to the output table; first try
 rmse_results <- tibble(method = "Just the average", RMSE = naive_rmse)
 
+#TODO : continue RMD from here
 
 #mu us the true rating for all movies
 #b_i is the average Bias for the movie i - calulcated per movie. no user is used to calculate this yet
@@ -283,8 +284,6 @@ rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
 find_generic_lambda <- function(seq_start, seq_end, seq_increment, FUN, detailed_flag = FALSE, training_set, testing_set, plot_title="")
 {
   lambdas <- seq(seq_start, seq_end, seq_increment)
-  #print("lambdas")
-  #print(lambdas)
   RMSE <- sapply(lambdas, FUN)
   #find the smallest lamdba
   print(qplot(lambdas, RMSE, main=plot_title))
@@ -297,13 +296,10 @@ find_generic_lambda <- function(seq_start, seq_end, seq_increment, FUN, detailed
   {
     #if this is the first iteration of the function, continue with taking a 10% lower and 10% higher lambda value to iterate through new lambdas that are much more granuluar, with increments at 10% of what they were previously.
     new_lambda_range = (seq_end - seq_start)/40
-    #print("new lamdbda ramge is:")
-    #print(new_lambda_range)
     min_lambda_first_try <- find_generic_lambda(seq_start = min_lambda_first_try - new_lambda_range, seq_end = min_lambda_first_try + new_lambda_range, 
                                                 seq_increment = seq_increment/10, FUN, detailed_flag = FALSE, training_set = training_set, testing_set = testing_set, plot_title=plot_title)
   }
   return (min_lambda_first_try)
-  
 }
 
 #trying regularization next; first need to find the correct lambda - tuning parameter:
