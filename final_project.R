@@ -3,14 +3,17 @@
 ##########################################################
 
 # Note: this process could take a couple of minutes
-
 if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
 if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
 if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
 if(!require(hexbin)) install.packages("hexbin", repos = "http://cran.us.r-project.org")
-if(!require(stringr)) install.packages("hexbin", repos = "http://cran.us.r-project.org")
-if(!require(lubridate)) install.packages("hexbin", repos = "http://cran.us.r-project.org")
-if(!require(ggrepel)) install.packages("hexbin", repos = "http://cran.us.r-project.org")
+if(!require(stringr)) install.packages("stringr", repos = "http://cran.us.r-project.org")
+if(!require(lubridate)) install.packages("lubridate", repos = "http://cran.us.r-project.org")
+if(!require(ggrepel)) install.packages("ggrepel", repos = "http://cran.us.r-project.org")
+if(!require(ggplot2)) install.packages("ggplot2", repos = "http://cran.us.r-project.org")
+if(!require(cowplot)) install.packages("cowplot", repos = "http://cran.us.r-project.org")
+if(!require(dplyr)) install.packages("dplyr", repos = "http://cran.us.r-project.org")
+
 
 library(tidyverse)
 library(caret)
@@ -18,6 +21,9 @@ library(data.table)
 library(stringr)
 library(lubridate)
 library(ggrepel)
+library(ggplot2)
+library(cowplot)
+library(dplyr)
 
 # MovieLens 10M dataset:
 # https://grouplens.org/datasets/movielens/10m/
@@ -57,7 +63,7 @@ movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
          title = str_trim(str_remove(title, "\\(\\d{4}\\)$")))
 
 #add in ratings average per movie
-rating_avgs <- ratings %>% group_by(movieId) %>% summarise(avg_rating = mean(rating))
+rating_avgs <- ratings %>% group_by(movieId) %>% summarise(avg_rating = mean(rating), rating_count = n())
 
 ratings <- inner_join(ratings, rating_avgs, by = "movieId")
 
@@ -94,13 +100,14 @@ movielens %>% filter(userId %in% users) %>%
   mutate(rating = 1) %>%
   spread(movieId, rating) %>% select(sample(ncol(.), 100)) %>% 
   as.matrix() %>% t(.) %>%
-  image(1:100, 1:100,. , xlab="Movies", ylab="Users", col="blue")
-abline(h=0:100+0.5, v=0:100+0.5, col = "grey")
+  image(1:100, 1:100,. , 
+        xlab="Movies", ylab="Users", col="blue", 
+        main="Sparsely Populated Ratings Sample, Movies vs. Users")
+abline(h=0:100+0.5, v=0:100+0.5, col = "grey") 
 
 
 #now we plot out a histogram of users to examine how many ratings per user exists in our system 
-users <- movielens %>% group_by(userId) %>% summarize(n = n())
-
+users <- movielens %>% group_by(userId) %>% summarize(n = n(), avg_user_rating = mean(rating))
 #Summarizing the users in the system, we have users with a minimum of 20 reviews; however, the maximum is over 7000 reviews per user
 users %>% summarise( max(n), min(n))
 
@@ -111,6 +118,29 @@ users %>%
   scale_x_log10() + 
   ggtitle("Users log10 Density Distribution")
 
+
+#Variability in reviews based 
+g1 <- users %>%
+  ggplot(aes(n, avg_user_rating)) + 
+  geom_point(color="blue", alpha=.3) + 
+  xlab("Ratings Per User") +ylab("Avg Rating") + geom_smooth(color='red') +
+  ggtitle("Ratings Count vs. Mean Rating") + scale_y_continuous(limits = c(0, 5)) +
+  theme(legend.position = "none", plot.title = element_text(size = 11, face="bold")) 
+
+g2 <- users %>% filter(n > 100) %>%
+  ggplot(aes(n, avg_user_rating)) + 
+  geom_point(color="blue", alpha=.3) + 
+  xlab("Ratings Per User") +ylab("Avg Rating") + geom_smooth(color='red') +
+  ggtitle("Ratings Count > 100 vs. Mean Rating")+ scale_y_continuous(limits = c(0, 5)) +
+  theme(legend.position = "none", plot.title = element_text(size = 11, face="bold")) 
+
+plot_grid(g1, g2)
+
+#here we'll adjust the movielens data set to remove users who have less then 100 reviews
+bigger_users <- users %>% filter(n > 100)
+movielens <- subset(movielens, (userId %in% bigger_users$userId))
+
+
 #We can also show that each movie is not rated as many times - the popular movies will be seen by many more people and will therefor be rated by many more people
 #Meanwhile, there are also many indpeendant films that will only be seen by a few people and therefore will only be rated by a small percentage of those.
 movielens %>%  group_by(movieId) %>% summarise(n = n()) %>%
@@ -119,10 +149,49 @@ movielens %>%  group_by(movieId) %>% summarise(n = n()) %>%
   scale_x_log10() + 
   ggtitle("Movie Ratings With log10 Density Distribution")
 
+
+####################
+#New evaluations since last version
+# The variability in ratings is much larger when the movie only has very few reviews. This is evident when the amount of a film's 
+#reviews is plotted against the film's mean ratings:
+
+g1 <- rating_avgs %>% ggplot(aes(rating_count, avg_rating)) + geom_point(color='blue', alpha=.5) + 
+  geom_smooth(aes(color='red')) + xlab("Cumulative Ratings Per Movie") + 
+  ylab("Average Movie Rating") + ggtitle("Ratings Variability") + 
+  scale_y_continuous(limits = c(0, 5)) + 
+  theme(legend.position = "none", plot.title = element_text(size = 11, face="bold")) 
+
+g2 <- rating_avgs %>% filter(rating_count > 350) %>%
+  ggplot(aes(rating_count, avg_rating)) + geom_point(color='blue', alpha=.5) + 
+  geom_smooth(aes(color='red')) + xlab("Cumulative Ratings Per Movie") + 
+  ylab("Average Movie Rating") + ggtitle("Ratings Variability") + 
+  ggtitle("Ratings Variability in films with > 350 ratings") +
+  scale_y_continuous(limits = c(0, 5))+ 
+  theme(legend.position = "none", plot.title = element_text(size = 11, face="bold")) 
+
+plot_grid(g1, g2)
+
+
+
+
+movielens %>% distinct(movieId, avg_rating, rating_count, genres) %>%
+  separate_rows(genres, sep = "\\|") %>%
+  filter(rating_count > 350) %>%
+  ggplot(aes(x = rating_count, y = avg_rating)) + 
+  geom_point(alpha=.5, color="blue") + geom_smooth(color='red') +
+  xlab("Cumulative Ratings Per Movie") + ylab("Average Movie Rating") + 
+  ggtitle("Movie Ratings Variability") + facet_wrap(~genres) 
+
+
+####################
+
+
+
+
 #The users set came with a spceifications that only users with 20 or more reviews are included; however, no such specification was done for movies; 
 #I believe that movies that have only a few reviews may very well be outliers and so should be excluded from the database.
-#Therefor, below, we include only the films with more then 100 reviews.
-bigger_films <- movielens %>% group_by(movieId) %>% summarise(n = n()) %>% filter(n > 100)
+#Therefor, below, we include only the films with more then 350 reviews.
+bigger_films <- movielens %>% group_by(movieId) %>% summarise(n = n()) %>% filter(n > 350)
 movielens <- subset(movielens, (movieId %in% bigger_films$movieId))
 
 #Next we examine the ratings system. In terms of ratings, we can that the ratings are on a scale of 0-5, in increments of 0.5. There are 10 discrete options, and the ratings are not continous.
@@ -144,13 +213,14 @@ movielens %>%
   stat_smooth(method = "lm", color = "magenta", size = 1) +
   ylab("Average Movie Rating") + xlab("Release Year") + ggtitle("Release Year vs Average Movie Ratings")
 
+
+
 #next, we'll explore how to movies have faired over time by Genre.
 #Based on the information, it is fairly obvious that most of the average ratings across genres have declined over the years. The notable exception to this is IMAX movies, and in a small way, animation. These trends make sense, as both IMAX and animated films have benefited greatly from technological advancements over the years.
 #The notable exception to those are IMAX mocies 
 movielens %>% na.omit() %>% separate_rows(genres, sep = "\\|") %>%
   ggplot(aes(release_year, avg_rating)) + stat_bin_hex(bins = 100) + #scale_fill_distiller(palette = "PuBuGn") +
   stat_smooth(method = "lm", color = "magenta", size = 1) +
-  #geom_smooth(aes(group=genres, color=genres)) + 
   ylab("Average Movie Rating") + xlab("Release Year") + ggtitle("Release Year vs Average Movie Ratings") +
   facet_wrap(~genres) + theme(axis.text.x = element_text(angle = 90))     
 
@@ -508,7 +578,7 @@ rm(tmp_rmse_results)
   
 
 # The final output 
-rmse_results %>% knitr::kable()
+rmse_results %>% knitr::kable(row.names=TRUE)
 
 
 
