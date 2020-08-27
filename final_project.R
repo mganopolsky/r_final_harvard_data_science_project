@@ -383,7 +383,7 @@ regularized_rmse_3 <- function(l, training_set, testing_set)
     group_by(movieId) %>% 
     summarize(s = sum(rating - mu), n_i = n())
   
-    predicted_ratings <- test_set %>% 
+    predicted_ratings <- testing_set %>% 
     left_join(just_the_sum, by='movieId') %>% 
     mutate(b_i = s/(n_i+l)) %>%
     mutate(pred = mu + b_i) %>%
@@ -434,7 +434,7 @@ regularized_movie_and_user <- function(l, training_set, testing_set)
     mutate(pred = mu + b_i + b_u) %>%
     pull(pred)
   
-  return(RMSE(predicted_ratings, test_set$rating))
+  return(RMSE(predicted_ratings, testing_set$rating))
   
 }
 
