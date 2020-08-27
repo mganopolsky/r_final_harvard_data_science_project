@@ -567,7 +567,7 @@ rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
 rm(tmp_rmse_results)
 
 
-final_rmse <- regularized_movie_and_user_and_year(model_6_lambda, train_set, validation)
+final_rmse <- regularized_movie_and_user_and_year_and_genre(model_6_lambda, train_set, validation)
 
 tmp_rmse_results <- tibble(method = "Final Model Tested on Validation Set", RMSE = final_rmse)
 
