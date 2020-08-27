@@ -230,10 +230,12 @@ Therefor, the database is fairly **sparsely populated**. I will visualize this l
 ### Sparcity
 
 ```{r percent_populated, echo = TRUE} 
-percent_populated <- (nrow(movielens)/(data_summary$n_users* data_summary$n_movies)) * 100
+percent_populated <- (nrow(movielens)/
+                        (data_summary$n_users* data_summary$n_movies)) * 100
+print(percent_populated)
 ```
 
-As noteed, if every user rated every movie, we would have approximately **`r format(data_summary$n_users * data_summary$n_movies, big.mark = ",")`** entries in the dataset; however, as shown above, we only have **`r  format(nrow(movielens), , big.mark = ",")`** ratings. Apparently, the data set is actually less then ** `r round(percent_populated, digits=2)` ** populated, which we can see from the calculation above.
+As noteed, if every user rated every movie, we would have approximately **`r format(data_summary$n_users * data_summary$n_movies, big.mark = ",")`** entries in the dataset; however, as shown above, we only have **`r  format(nrow(movielens), , big.mark = ",")`** ratings. Apparently, the data set is actually less then **`r round(percent_populated, digits=2)`%** populated, which we can see from the calculation above.
 
 Visually, we can show the sparseness on a small sample of the data, with the following image graph:
 
@@ -272,7 +274,7 @@ users %>%
 
 \pagebreak
 
-If we examine the trends in the amount of ratings a user submits, versus the average rating, per user, we can clearly see that users with smaller amounts of ratings are much more likely to give extreme ratings on either side of the scale - be either very cranky (and give a rating of .5) or extra optimistic (and give a rating of 5). In the plots below I show the difference in the variability of user's average rating trends vs. the amount of ratings they have submitted. **But omitting users with 100 reviews or less**, we limit the crankiness of the users slightly.\newline
+If we examine the trends in the amount of ratings a user submits, versus the average rating, per user, we can clearly see that users with smaller amounts of ratings are much more likely to give extreme ratings on either side of the scale - be either very cranky (and give a rating of .5) or extra optimistic (and give a rating of 5). In the plots below I show the difference in the variability of user's average rating trends vs. the amount of ratings they have submitted. **By omitting users with 100 reviews or less**, we limit the crankiness of the users slightly.\newline
 
 ```{r user_avg_rating, echo = FALSE, warning=FALSE, message=FALSE} 
 g1 <- users %>%
@@ -356,7 +358,7 @@ From the data and the bar graph of the ratings, we can make one these conclusion
 
 \pagebreak
 
-Plotting release year vs avg movie ratings - it seems movies are either getting worse with time, or the reviewers are getting pickier.\newline
+Plotting release year vs. avg movie ratings - it seems movies are either getting worse with time, or the reviewers are getting pickier.\newline
 ```{r avg_rating_vs_year,  echo = TRUE, warning=FALSE, message=FALSE}
 movielens %>%
   ggplot(aes(release_year, avg_rating)) + 
@@ -378,7 +380,7 @@ genres <- unique(movielens$genres)
 print(genres)
 ```
 
-Next, we'll explore how ratings have fared over time by **genre**. Based on the visualizations provided here, it is fairly obvious that **most of the average ratings across genres have declined over the years**. The notable exception to this is **IMAX** movies, and in a small way, **animation**. These trends make sense, as both IMAX and animated films have benefited greatly from technological advancements over the years.\newline\newline
+Next, we'll explore how ratings have fared over time by **genre**. Based on the visualizations provided here, it is fairly obvious that **most of the average ratings across genres have declined over the years**. The notable exception to this is **IMAX** movies, and in a small way, **Animation**. These trends make sense, as both IMAX and animated films have benefited greatly from technological advancements over the years.\newline\newline
 
 ```{r genres_ratings_facet,  echo = FALSE, warning=FALSE, message=FALSE}
 movielens %>% na.omit() %>% 
@@ -896,6 +898,8 @@ The first term in the equation above is the mean squared error calculation , and
 
 The RMSE arrived at with this model is **`r final_rmse`** - which is sufficiently accurate, as it is lower than the initial evaluation criteria **`r threshold_value`** given by the goal of the present project.
 
+**It is worth noting that the current RMSE numbers were achieved after editing the data to remove users with less then 100 reviews, and movies with less then 350 reviews. Without removing this data, comprised of mostly outliers, the RMSE was a lot more accurate**. 
+
 ## Other Options
 
 ### Using Various Regression Functions.
@@ -903,9 +907,13 @@ During this process I have also attempted to run the predictions using the ```tr
 
 ### Possible Improvements
 
-I think improvements on the RMSE could be achieved by adding by evaluating the project with other means. Other different machine learning models could also improve the results further, but hardware limitations, as the RAM, are a constraint. 
+I think improvements on the RMSE could be achieved by evaluating the project with other means. Different machine learning models could also improve the results further, but hardware limitations (memory and processing power) may be a constraint.
 
+The possible evaluation models we can also attempt to get even better results would include:
 
+* Matrix factorization and Single Value Decomposition (SVD) and Principal Component Analysis (PCA)
+* Gradient Descent 
+* SGD Code Walk
 
 
 \pagebreak
