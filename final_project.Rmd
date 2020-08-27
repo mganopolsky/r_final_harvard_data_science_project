@@ -13,7 +13,7 @@ header-includes:
 - \setmainfont{Montserrat}
 number_sections: true
 graphics: yes
-toc_depth: 4
+toc_depth: 5
 df_print: kable
 fontsize: 12pt
 editor_options: 
@@ -66,6 +66,8 @@ With this consideration, I have massaged the data, **removing films that have le
 Seven (7) models will be developed, ranging from the most naive to the most complex. These will be tested and compared using the resulting RMSE in order to assess their quality.  The ideal evaluation criteria for this project, as specified by the assignment, is a RMSE that is expected to be lower than **`r threshold_value`**.
 
 After evaluating every available algorithm I have come up with using the RMSE, the best-resulting model will be used on the **validation dataset** to evaluate the quality of the predictions of the movie ratings.
+
+This project can be found on GitHub under https://github.com/mganopolsky/r_final_harvard_data_science_project.   
 
 ## Dataset
 
@@ -167,7 +169,7 @@ movielens <- inner_join(ratings, movies, by = "movieId") %>%
 
 I will re-iterate that the algorithm development and tuning will be conducted on one part of the data, and the validation set will be used to evaluate the final chosen data model. **During no other time will the validation dataset be used.**
 
-As a first step, in order to get some basic information about the data we're working with, we examine the **```movielens```** dataset. The originl data contains six variables :
+As a first step, in order to get some basic information about the data we're working with, we examine the **```movielens```** dataset. The original data contains six variables :
 
 * **userID**
 * **movieId**
@@ -187,7 +189,7 @@ After massaging the data a bit, the following fields were added, as derived from
 
 
 Per row, this is a representation of one user's rating of a single movie. As you can tell, the **genres** per film are currently combined into **"|"**-delimited string, which I will later separate. 
-**As a first glance, here's a snapshop of dataset:**
+**As a first glance, here's a snapshot of dataset:**
 
 ```{r, head, echo = FALSE, tidy=TRUE}
 str(movielens)
@@ -223,11 +225,11 @@ nrow(movielens)
 ```
 Therefor, the database is fairly **sparsely populated**. I will visualize this later in the document.
 
-# Method and Analysis
+# Methods and Analysis
 
 ## Data Insights, Cleaning & Visualizations
 
-### Sparcity
+### Sparsity
 
 ```{r percent_populated, echo = TRUE} 
 percent_populated <- (nrow(movielens)/
@@ -235,7 +237,7 @@ percent_populated <- (nrow(movielens)/
 print(percent_populated)
 ```
 
-As noteed, if every user rated every movie, we would have approximately **`r format(data_summary$n_users * data_summary$n_movies, big.mark = ",")`** entries in the dataset; however, as shown above, we only have **`r  format(nrow(movielens), , big.mark = ",")`** ratings. Apparently, the data set is actually less then **`r round(percent_populated, digits=2)`%** populated, which we can see from the calculation above.
+As noted, if every user rated every movie, we would have approximately **`r format(data_summary$n_users * data_summary$n_movies, big.mark = ",")`** entries in the dataset; however, as shown above, we only have **`r  format(nrow(movielens), , big.mark = ",")`** ratings. Apparently, the data set is actually less then **`r round(percent_populated, digits=2)`%** populated, which we can see from the calculation above.
 
 Visually, we can show the sparseness on a small sample of the data, with the following image graph:
 
@@ -490,7 +492,7 @@ This value will be used with the RMSE function to test the accuracy with most na
 rmse_results %>% knitr::kable(row.names=TRUE)
 ```
 
-As I continue with the project, I will add the results of the RMSE of every model I test to the **```rmse_results```** variable, and print out the table as I have above - so that the data can be reviewd as the project progresses.\newline
+As I continue with the project, I will add the results of the RMSE of every model I test to the **```rmse_results```** variable, and print out the table as I have above - so that the data can be reviewed as the project progresses.\newline
 Taking the average of the existing ratings is a very naive predictor. We can see that the RMSE is > 1.0, which means this isn't a great prediction - as expected. In the rest of the project I will examine several better approaches.
 
 ###  2. Movie effect model
@@ -873,7 +875,7 @@ rmse_results %>% knitr::kable(row.names=TRUE)
 
 It is apparent from the numbers presented above that without regularization, simply applying Model #3, the
 **"User Effect + Movie Effect Model"** will actually give us an RMSE low enough to be acceptable, as the output of that model, **`r model_2_rmse`** is less then the threshold value of **`r threshold_value`**.\newline (A notable observation : these numbers were only acceptable after the data has been massaged to remove films that had too few ratings, and remove users who had less then 100 reviews.)
-However, I wanted to examine other options for improvement and introduced regularization into the models. The simplest regularization model, using only the movie affect with an optimized lambda, was not good enough for our calculations, and actually regressed from our third model, described above. However, regularization with movie AND user effect beat the previously best-performing model. Adding in the release year in model # 6 increased our performace even further, and finally, using regularization combined with the movie, user, release year and genre effects proved to be the most efficient model. 
+However, I wanted to examine other options for improvement and introduced regularization into the models. The simplest regularization model, using only the movie affect with an optimized lambda, was not good enough for our calculations, and actually regressed from our third model, described above. However, regularization with movie AND user effect beat the previously best-performing model. Adding in the release year in model # 6 increased our performance even further, and finally, using regularization combined with the movie, user, release year and genre effects proved to be the most efficient model. 
 **Applying this final model, #7, to the validation set, gave us a validated RMSE of `r final_rmse`**. 
 
 # Conclusion
@@ -911,7 +913,7 @@ I think improvements on the RMSE could be achieved by evaluating the project wit
 
 The possible evaluation models we can also attempt to get even better results would include:
 
-* Matrix factorization and Single Value Decomposition (SVD) and Principal Component Analysis (PCA)
+* Matrix factorization / Single Value Decomposition (SVD) / Principal Component Analysis (PCA)
 * Gradient Descent 
 * SGD Code Walk
 

@@ -2,6 +2,10 @@
 This is Part I of the Capstone Project for the Harvard Data Science Certificate - HarvardX: PH125.9x
 This project was completed by Marina Ganopolsky.
 
+**The purpose** of the project was the build a **recommendation system for movie ratings**, test said system on a variety of predictive models, and then **validate the data using RMSE** and a validation data partition. 
+
+**The assignment expects the RMSE of the predicted ratings to be below .9 and ideally, less then .8649.**
+
 The description of the project, as assigned, follows below:
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 You will use the following code to generate your datasets. Develop your algorithm using the edx set. For a final test of your algorithm, predict movie ratings in the validation set (the final hold-out test set) as if they were unknown. RMSE will be used to evaluate how close your predictions are to the true values in the validation set (the final hold-out test set).
