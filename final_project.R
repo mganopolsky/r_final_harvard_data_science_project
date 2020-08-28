@@ -13,7 +13,8 @@ if(!require(ggrepel)) install.packages("ggrepel", repos = "http://cran.us.r-proj
 if(!require(ggplot2)) install.packages("ggplot2", repos = "http://cran.us.r-project.org")
 if(!require(cowplot)) install.packages("cowplot", repos = "http://cran.us.r-project.org")
 if(!require(dplyr)) install.packages("dplyr", repos = "http://cran.us.r-project.org")
-
+if(!require(here)) install.packages("here", repos = "http://cran.us.r-project.org")
+if(!require(formatR)) install.packages("here", repos = "http://cran.us.r-project.org")
 
 library(tidyverse)
 library(caret)
@@ -24,6 +25,8 @@ library(ggrepel)
 library(ggplot2)
 library(cowplot)
 library(dplyr)
+library(here)
+library(formatR)
 
 # MovieLens 10M dataset:
 # https://grouplens.org/datasets/movielens/10m/
@@ -46,15 +49,16 @@ if (file.exists("ml-10m.zip")) {
   download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
 }
 
+#downloading the ratings info
 ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
                  col.names = c("userId", "movieId", "rating", "timestamp"))
 
+#downloading the movie info
 movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
 colnames(movies) <- c("movieId", "title", "genres")
 
-# if using R 4.0 or later
-#mutate to add the "release_year" column, format it as a numeric, and remove the (year) pattern from the title 
 
+#mutate the movies dataframe to add the "release_year" column, format it as a numeric, and remove the (year) pattern from the title 
 movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
                                            title = as.character(title),
                                            genres = as.character(genres)) %>%
@@ -62,12 +66,13 @@ movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
   mutate(release_year = as.numeric(str_remove(str_remove(release_year, "[\\(]"), "[\\)]")) ,
          title = str_trim(str_remove(title, "\\(\\d{4}\\)$")))
 
-#add in ratings average per movie
+#add in ratings average and ratings_count per movie, into the dataset
 rating_avgs <- ratings %>% group_by(movieId) %>% summarise(avg_rating = mean(rating), rating_count = n())
 
 ratings <- inner_join(ratings, rating_avgs, by = "movieId")
 
-# add the date field , converting the timestamp to an actual date, and rounding to the nearest day
+# add the rating date field , converting the timestamp to an actual date, and rounding to the nearest day
+#adding the rating year field for possible use
 #use inner_join instead of provided left_join to make sure the movie titles and genres are populated
 movielens <- inner_join(ratings, movies, by = "movieId") %>% 
   mutate(rating_date = round_date(as_datetime(timestamp), unit="day"),
@@ -82,7 +87,7 @@ summary(movielens)
 #to draw some conclusions. First, there are currently this amount of ratings in the dataset:
 nrow(movielens)
 
-#We check to see how many unique movies and users we have in the system
+#We check to see how many unique movies and unique users we have in the system
 data_summary <- movielens %>% summarize(n_users = n_distinct(userId), n_movies = n_distinct(movieId))
 
 data_summary
@@ -119,7 +124,7 @@ users %>%
   ggtitle("Users log10 Density Distribution")
 
 
-#Variability in reviews based 
+#Variability in all reviews 
 g1 <- users %>%
   ggplot(aes(n, avg_user_rating)) + 
   geom_point(color="blue", alpha=.3) + 
@@ -127,6 +132,8 @@ g1 <- users %>%
   ggtitle("Ratings Count vs. Mean Rating") + scale_y_continuous(limits = c(0, 5)) +
   theme(legend.position = "none", plot.title = element_text(size = 11, face="bold")) 
 
+
+#variability is significantly less if you remove users that have submitted less then 100 reviews
 g2 <- users %>% filter(n > 100) %>%
   ggplot(aes(n, avg_user_rating)) + 
   geom_point(color="blue", alpha=.3) + 
@@ -134,6 +141,7 @@ g2 <- users %>% filter(n > 100) %>%
   ggtitle("Ratings Count > 100 vs. Mean Rating")+ scale_y_continuous(limits = c(0, 5)) +
   theme(legend.position = "none", plot.title = element_text(size = 11, face="bold")) 
 
+#plotting both side by side
 plot_grid(g1, g2)
 
 #here we'll adjust the movielens data set to remove users who have less then 100 reviews
@@ -142,7 +150,7 @@ movielens <- subset(movielens, (userId %in% bigger_users$userId))
 
 
 #We can also show that each movie is not rated as many times - the popular movies will be seen by many more people and will therefor be rated by many more people
-#Meanwhile, there are also many indpeendant films that will only be seen by a few people and therefore will only be rated by a small percentage of those.
+#Meanwhile, there are also many independant films that will only be seen by a few people and therefore will only be rated by a small percentage of those.
 movielens %>%  group_by(movieId) %>% summarise(n = n()) %>%
   ggplot(aes(n)) + 
   geom_histogram(fill = "blue", color="black", bins = 40) +
@@ -155,12 +163,14 @@ movielens %>%  group_by(movieId) %>% summarise(n = n()) %>%
 # The variability in ratings is much larger when the movie only has very few reviews. This is evident when the amount of a film's 
 #reviews is plotted against the film's mean ratings:
 
+#ratings for all movies
 g1 <- rating_avgs %>% ggplot(aes(rating_count, avg_rating)) + geom_point(color='blue', alpha=.5) + 
   geom_smooth(aes(color='red')) + xlab("Cumulative Ratings Per Movie") + 
   ylab("Average Movie Rating") + ggtitle("Ratings Variability") + 
   scale_y_continuous(limits = c(0, 5)) + 
   theme(legend.position = "none", plot.title = element_text(size = 11, face="bold")) 
 
+#ratings for movies that have recieved > 350 reviews
 g2 <- rating_avgs %>% filter(rating_count > 350) %>%
   ggplot(aes(rating_count, avg_rating)) + geom_point(color='blue', alpha=.5) + 
   geom_smooth(aes(color='red')) + xlab("Cumulative Ratings Per Movie") + 
@@ -169,11 +179,12 @@ g2 <- rating_avgs %>% filter(rating_count > 350) %>%
   scale_y_continuous(limits = c(0, 5))+ 
   theme(legend.position = "none", plot.title = element_text(size = 11, face="bold")) 
 
+#plotting these side by side
 plot_grid(g1, g2)
 
 
 
-
+#cumulative ratings per genre, once separated
 movielens %>% distinct(movieId, avg_rating, rating_count, genres) %>%
   separate_rows(genres, sep = "\\|") %>%
   filter(rating_count > 350) %>%
@@ -188,7 +199,8 @@ movielens %>% distinct(movieId, avg_rating, rating_count, genres) %>%
 
 
 
-#The users set came with a spceifications that only users with 20 or more reviews are included; however, no such specification was done for movies; 
+#The users set came with a spceifications that only users with 20 or more reviews are included (and we've increased that to 100); 
+#however, no such specification was done for movies; 
 #I believe that movies that have only a few reviews may very well be outliers and so should be excluded from the database.
 #Therefor, below, we include only the films with more then 350 reviews.
 bigger_films <- movielens %>% group_by(movieId) %>% summarise(n = n()) %>% filter(n > 350)
@@ -196,6 +208,7 @@ movielens <- subset(movielens, (movieId %in% bigger_films$movieId))
 
 #Next we examine the ratings system. In terms of ratings, we can that the ratings are on a scale of 0-5, in increments of 0.5. There are 10 discrete options, and the ratings are not continous.
 types_of_ratings <- sort(unique(movielens$rating))
+
 
 movielens %>%
   ggplot(aes(rating)) +  xlab("Movie Rating") + ylab("Cumulative Rating Count") +
@@ -215,7 +228,7 @@ movielens %>%
 
 
 
-#next, we'll explore how to movies have faired over time by Genre.
+#next, we'll explore how movies have faired over time by Genre.
 #Based on the information, it is fairly obvious that most of the average ratings across genres have declined over the years. The notable exception to this is IMAX movies, and in a small way, animation. These trends make sense, as both IMAX and animated films have benefited greatly from technological advancements over the years.
 #The notable exception to those are IMAX mocies 
 movielens %>% na.omit() %>% separate_rows(genres, sep = "\\|") %>%
@@ -276,9 +289,8 @@ edx <- rbind(edx, removed)
 
 #TODO: remove the movielens object as well 
 #remove all the objects from memory
-rm(dl, ratings, movies, test_index, temp, removed) #, movielens, )
+rm(dl, ratings, movies, test_index, temp, removed, movielens )
 
-#adjusted the RMSE function to account for NA and Null values
 RMSE <- function(true_ratings, predicted_ratings){
   sqrt(mean((true_ratings - predicted_ratings)^2))
 }
@@ -350,18 +362,29 @@ rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
 #Next we will attempt to improve the algorithms with regularization.
 #For this purpose, we will calculate a range of lambda values, and pick the smallest one in order to calculate the lowest RMSE
 
-#function that will create the loose labmdas, and then come up with a more detailed lambda evaluation when we have an idea where the lowest value is
+#This is a function that will create the loose labmdas, by using large intervals, and then come up with a more detailed lambda evaluation when we have an idea where the lowest value is
+
+#The function below will be used by every regularized algorithm; it will take in the following parameters :
+#seq_start - start of the lambda range
+#seq_end - end of the lambda range
+#seq_increment - the increments to use in order to traverse the lambda range
+#FUN - function passed in as a parameter (this is how find_generic_lambda is able to be used in every regularized algorithm calculation)
+#detailed_flag - a boolean flag that will indicate whether a recursive call will be needed to find more granular lambdas. 
+# training_set, testing_set - the data sets passed in to evaluate the testing set 
+#The function is meant to be called exactly twice - once to find the rough range of the lambda, and once again to find a more granular detailed lambda.
+#The recursive call is set up in order to optimize performance - if we were to run the algorithm with the final granularity, it will be an order of magnitude slower.
+
 find_generic_lambda <- function(seq_start, seq_end, seq_increment, FUN, detailed_flag = FALSE, training_set, testing_set, plot_title="")
 {
   lambdas <- seq(seq_start, seq_end, seq_increment)
+  #calculate the RMSEs for the FUN - regularized function passed in - with the lambda range created above
   RMSE <- sapply(lambdas, FUN)
-  #find the smallest lamdba
+  #plot the output to see the smallest lamdba
   print(qplot(lambdas, RMSE, main=plot_title))
-  #saving the first round lambda 
+  #saving the first round lambda - the lowest labda value we've come up with so far
   min_lambda_first_try <- lambdas[which.min(RMSE)]
-  #print("rough lamdbda is:")
-  #print(min_lambda_first_try)
   
+  #
   if (detailed_flag)
   {
     #if this is the first iteration of the function, continue with taking a 10% lower and 10% higher lambda value to iterate through new lambdas that are much more granuluar, with increments at 10% of what they were previously.
