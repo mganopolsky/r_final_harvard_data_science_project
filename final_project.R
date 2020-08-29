@@ -289,7 +289,7 @@ edx <- rbind(edx, removed)
 
 #TODO: remove the movielens object as well 
 #remove all the objects from memory
-rm(dl, ratings, movies, test_index, temp, removed, movielens )
+#rm(dl, ratings, movies, test_index, temp, removed, movielens )
 
 RMSE <- function(true_ratings, predicted_ratings){
   sqrt(mean((true_ratings - predicted_ratings)^2))
@@ -521,7 +521,7 @@ tmp_rmse_results <- tibble(method = "Regularized Movie + User Effect Model + Yea
 #add to existing rmse results table
 rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
 
-rm(tmp_rmse_results)
+#rm(tmp_rmse_results)
 
 #The year seems to have made a difference, but a fairly insignificant one in our model; 
 #The next item to be tested is the genre. 

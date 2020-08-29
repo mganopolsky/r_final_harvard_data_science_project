@@ -24,11 +24,11 @@ fontsize: 12pt
 editor_options: 
   chunk_output_type: console
 ---
-
 ```{r cache=TRUE}
-
 knitr::opts_chunk$set(cache =TRUE)
+```
 
+```{r setup}
 threshold_value <- 0.86490
 
 library(here)
