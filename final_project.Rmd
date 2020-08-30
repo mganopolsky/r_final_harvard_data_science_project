@@ -22,21 +22,14 @@ toc_depth: 5
 df_print: kable
 fontsize: 12pt
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
-```{r cache=TRUE}
-knitr::opts_chunk$set(cache =TRUE)
+```{r setup, cache=TRUE}
+knitr::opts_chunk$set(cache=TRUE)
 ```
 
-```{r setup}
+```{r setup_1, cache=TRUE}
 threshold_value <- 0.86490
-
-library(here)
-directory <- here::here()
-env_file <- paste(directory, "/env.RData", sep="")
-#str(env_file)
-load(file = env_file)
-
 ```
 \pagebreak
 
@@ -868,12 +861,12 @@ well below the required threshold of **`r threshold_value`**.
 We can now review the complete set of RMSE calculations :
 
 ```{r regularized_movie_and_user_and_year_validation, echo = TRUE,  warning=FALSE, message=FALSE, cache=TRUE}
-tmp_rmse_results <- tibble(method = "Final Model Tested on Validation Set", 
+final_rmse_results <- tibble(method = "Final Model Tested on Validation Set", 
                            RMSE = final_rmse)
 
 #add to existing rmse results table
-rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
-rm(tmp_rmse_results)
+rmse_results <- bind_rows(rmse_results, final_rmse_results)
+
 # The final output 
 rmse_results %>% knitr::kable(row.names=TRUE)
 ```
