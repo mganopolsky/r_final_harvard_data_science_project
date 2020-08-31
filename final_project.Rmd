@@ -24,11 +24,11 @@ fontsize: 12pt
 editor_options: 
   chunk_output_type: inline
 ---
-```{r setup, cache=TRUE}
+```{r setup,  include=FALSE, cache=TRUE}
 knitr::opts_chunk$set(cache=TRUE)
 ```
 
-```{r setup_1, cache=TRUE}
+```{r setup_1,  include=FALSE, cache=TRUE}
 threshold_value <- 0.86490
 ```
 \pagebreak
@@ -89,7 +89,7 @@ A fair amount of data manipulation has been done to the datasets created with th
   + **A testing dataset** - the data the intermediate algorithms will be tested on
 
 
-```{r intro, echo = TRUE, message = TRUE, warning = FALSE, results='hide', cache=TRUE}
+```{r intro, echo = TRUE, message = TRUE, warning = FALSE, results='hide', cache=TRUE, include=FALSE}
 
 
 if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
@@ -201,18 +201,18 @@ head(movielens) %>%
 \pagebreak
 **A summary of the subset confirms that there are no missing values.**
 
-```{r movie_summary, summary, echo = TRUE, tidy=TRUE, cache=TRUE}
+```{r movie_summary, include=FALSE, echo = TRUE, tidy=TRUE, cache=TRUE}
 summary(movielens)
 ```
 
-```{r data_summary , echo = TRUE, tidy=TRUE, cache=TRUE}
+```{r data_summary ,include=FALSE, echo = TRUE, tidy=TRUE, cache=TRUE}
 data_summary <- movielens %>% 
   summarize(n_users = n_distinct(userId), n_movies = n_distinct(movieId))
 ```
 
 The total of unique movies and users in the movielens subset is **`r format(data_summary$n_users, big.mark = ",")`** unique users and **`r  format(data_summary$n_movies, big.mark = ",")`** different movies:**
 
-```{r data_summary2 , echo = TRUE, tidy=TRUE, cache=TRUE}
+```{r data_summary2 , echo = TRUE, tidy=TRUE, cache=TRUE, include=FALSE}
 print(data_summary)
 ```
 If every user rated every movie, we would have **`r format(data_summary$n_users * data_summary$n_movies, big.mark = ",")`** rows; however, we only have this many rows:
@@ -373,16 +373,21 @@ movielens %>%
 ### Genres
 
 Next in the data wrangling process, I will separate the genres from the combined, "|"-delimited values into separate genres, one entry per rating, per movie, per genre. We can now view the unique genres available in the system:
-```{r genre_separted,  echo = TRUE, warning=FALSE, message=FALSE, tidy=TRUE, cache=TRUE}
-movielens <- movielens %>% separate_rows(genres, sep ="\\|")
-genres <- unique(movielens$genres)
-print(genres)
+```{r genre_separted,  echo = FALSE, warning=FALSE, message=FALSE, tidy=TRUE, cache=TRUE}
+#movielens <- movielens %>% separate_rows(genres, sep ="\\|")
+#genres <- movielens %>% separate_rows(genres, sep ="\\|") %>% unique(genres)
+#print(genres)
+#movies_by_genre <- movielens %>% separate_rows(genres, sep ="\\|") %>% group_by(genres) %>% summarize(count = n()) %>% arrange(count)
+
+movies_by_genre <- movielens %>% separate_rows(genres, sep ="\\|") %>% group_by(genres) %>% summarize(count = n(), avg_rating = mean(rating)) %>% arrange(count)
+
+print(unique(movies_by_genre$genres))
 ```
 
 Next, we'll explore how ratings have fared over time by **genre**. Based on the visualizations provided here, it is fairly obvious that **most of the average ratings across genres have declined over the years**. The notable exception to this is **IMAX** movies, and in a small way, **Animation**. These trends make sense, as both IMAX and animated films have benefited greatly from technological advancements over the years.\newline\newline
 
 ```{r genres_ratings_facet,  echo = TRUE, warning=FALSE, message=FALSE, cache=TRUE}
-movielens %>% na.omit() %>% 
+movielens %>% na.omit() %>% separate_rows(genres, sep ="\\|") %>%
   ggplot(aes(release_year, avg_rating)) + stat_bin_hex(bins = 100) + #scale_fill_distiller(palette = "PuBuGn") +
   stat_smooth(method = "lm", color = "magenta", size = 1) +
   ylab("Average Movie Rating") + xlab("Release Year") + ggtitle("Release Year vs Average Movie Ratings") +
@@ -394,7 +399,8 @@ movielens %>% na.omit() %>%
 **The plot below shows the trends of how how many films get rated by **genre**. **
 
 ```{r reviews_by_genre,  echo = TRUE, warning=FALSE, message=FALSE, cache=TRUE}
-movies_by_genre <- movielens %>% group_by(genres) %>% summarize(count = n()) %>% arrange(count)
+#movies_by_genre <- movielens %>% separate_rows(genres, sep ="\\|") %>% 
+#  group_by(genres) %>% summarize(count = n()) %>% arrange(count)
 
 movies_by_genre %>% 
   mutate(genres = factor(genres, levels = unique(as.character(genres)))) %>%
@@ -416,8 +422,9 @@ The answer seems to be a resounding **YES**!\newline
 
 In general, the average rating by genre can be shown on this plot; **Film Noir** seems to have the highest average rating, while **Horror** films have the lowest.
 ```{r avg_rating_by_genre_plots,  echo = TRUE, warning=FALSE, message=FALSE, fig.align='left', cache=TRUE}
-ratings_summary_by_genre <- movielens %>% group_by(genres) %>% summarise(avg_rating = mean(rating)) 
-ratings_summary_by_genre %>% ggplot(aes(genres, avg_rating, size = 3, col=genres)) + 
+#ratings_summary_by_genre <- movielens %>% separate_rows(genres, sep ="\\|") %>% 
+#      group_by(genres) %>% summarise(avg_rating = mean(rating)) 
+movies_by_genre %>% ggplot(aes(genres, avg_rating, size = 3, col=genres)) + 
   geom_point() +   theme(axis.title.x=element_blank(), legend.title = element_blank(),
                          axis.text.x=element_blank(), legend.key= element_blank(),
                          axis.ticks.x=element_blank(), legend.text = element_blank(), legend.position="none") +

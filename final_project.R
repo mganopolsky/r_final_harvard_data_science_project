@@ -240,15 +240,15 @@ movielens %>% na.omit() %>% separate_rows(genres, sep = "\\|") %>%
 
 
 #separate the genres from the combined values into separate ones
-movielens <- movielens %>% separate_rows(genres, sep ="\\|")
+#movielens <- movielens %>% separate_rows(genres, sep ="\\|")
 
 
 #We will now evaluate how many genres are present.
-genres <- unique(movielens$genres)
-genres
+#genres <- movielens %>% separate_rows(genres, sep ="\\|") %>% unique(movielens$genres)
+#genres
 
 #I would like to examine the patterns of movie reviews by genre; Do people tend to review certain genres more then others?
-movies_by_genre <- movielens %>% group_by(genres) %>% summarize(count = n()) %>% arrange(count)
+movies_by_genre <- movielens %>% separate_rows(genres, sep ="\\|") %>% group_by(genres) %>% summarize(count = n(), avg_rating = mean(rating)) %>% arrange(count)
 
 
 movies_by_genre %>% 
@@ -261,9 +261,10 @@ movies_by_genre %>%
 
 #The answer seems to be a resounding YES! Drama seems to have the most reviews, while IMAX has by far the least; this pattern makes sense, since only a small percentage of movies gets released in IMAX (although the ones that are are super popular, and will thus get more reviews.)
 
-ratings_summary_by_genre <- movielens %>% group_by(genres) %>% summarise(avg_rating = mean(rating)) 
-ratings_summary_by_genre %>% ggplot(aes(genres, avg_rating, size = 3, col=genres)) + 
-  geom_point() +   theme(axis.title.x=element_blank(), legend.title = element_blank(),
+#ratings_summary_by_genre <- movielens %>% separate_rows(genres, sep ="\\|") %>% group_by(genres) %>% summarise(avg_rating = mean(rating)) 
+#ratings_summary_by_genre %>% ggplot(aes(genres, avg_rating, size = 3, col=genres)) + 
+  movies_by_genre %>% ggplot(aes(genres, avg_rating, size = 3, col=genres)) + 
+    geom_point() +   theme(axis.title.x=element_blank(), legend.title = element_blank(),
                          axis.text.x=element_blank(), legend.key= element_blank(),
                          axis.ticks.x=element_blank(), legend.text = element_blank(), legend.position="none") +
   geom_label_repel(aes(label = genres),
@@ -406,15 +407,15 @@ regularized_rmse_3 <- function(l, training_set, testing_set)
     group_by(movieId) %>% 
     summarize(s = sum(rating - mu), n_i = n())
   
-    predicted_ratings <- testing_set %>% 
+  predicted_ratings <- testing_set %>% 
     left_join(just_the_sum, by='movieId') %>% 
     mutate(b_i = s/(n_i+l)) %>%
     mutate(pred = mu + b_i) %>%
     pull(pred)
-    
-    l_rmse <- RMSE(predicted_ratings, testing_set$rating)
-    #print(l_rmse)
-    return (l_rmse)
+  
+  l_rmse <- RMSE(predicted_ratings, testing_set$rating)
+  #print(l_rmse)
+  return (l_rmse)
 }
 
 #testing out the regularization with lamdba - 
@@ -504,15 +505,15 @@ regularized_movie_and_user_and_year <- function(l, training_set, testing_set)
     left_join(b_y, by = "age_of_movie") %>%
     mutate(pred = mu + b_i + b_u + b_y) %>%
     pull(pred)
- 
+  
   rmse <- RMSE(predicted_ratings, testing_set$rating)
   #print(rmse) 
   return(rmse)
 }
 
 model_5_lamdba <- find_generic_lambda(seq_start=0, seq_end=10, seq_increment=0.5, 
-                                    FUN= function(x) regularized_movie_and_user_and_year(x, training_set=train_set, testing_set=test_set ), 
-                                    detailed_flag = TRUE, training_set=train_set, testing_set=test_set, plot_title = "Testing Lambdas for Movie Affect, User Bias Effect and Film Age Affect")
+                                      FUN= function(x) regularized_movie_and_user_and_year(x, training_set=train_set, testing_set=test_set ), 
+                                      detailed_flag = TRUE, training_set=train_set, testing_set=test_set, plot_title = "Testing Lambdas for Movie Affect, User Bias Effect and Film Age Affect")
 
 model_5_rmse <- regularized_movie_and_user_and_year(model_5_lamdba, train_set, test_set)
 
@@ -529,7 +530,7 @@ rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
 
 regularized_movie_and_user_and_year_and_genre <- function(l, training_set, testing_set)
 {
-
+  
   mu <- mean(training_set$rating)
   
   b_i <- training_set %>% 
@@ -598,7 +599,7 @@ find_rmse_results <- tibble(method = "Final Model Tested on Validation Set", RMS
 rmse_results <- bind_rows(rmse_results, find_rmse_results)
 
 #rm(tmp_rmse_results)
-  
+
 
 # The final output 
 rmse_results %>% knitr::kable(row.names=TRUE)
