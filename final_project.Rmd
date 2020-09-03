@@ -24,13 +24,16 @@ fontsize: 12pt
 editor_options: 
   chunk_output_type: inline
 ---
-```{r setup,  include=FALSE, cache=TRUE}
-knitr::opts_chunk$set(cache=TRUE)
-```
 
 ```{r setup_1,  include=FALSE, cache=TRUE}
 threshold_value <- 0.86490
 ```
+
+
+```{r, include=FALSE, cache=FALSE, echo=FALSE}
+knitr::read_chunk('final_project.R')
+```
+
 \pagebreak
 
 # Overview
@@ -53,9 +56,6 @@ An exploratory analysis will be performed to generate predicted movie ratings, w
 The function used to evaluate algorithm performance is the **Root Mean Square Error**, or RMSE. RMSE is one of the most frequently used measures of the differences between values predicted by a model and the values observed. RMSE is a measure of accuracy, and a lower RMSE is better than a higher one. The effect of each error on RMSE is proportional to the size of the squared error; thus larger errors have a disproportionately large effect on RMSE. Because of this, the RMSE algorithm is sensitive to outliers. 
 
 $$RMSE = \sqrt{\frac{1}{N}\displaystyle\sum_{u,i} (\hat{y}_{u,i}-y_{u,i})^{2}}$$
-
-With this consideration, I have massaged the data, **removing films that have less then 350 reviews**; the logic behind this is that large outliers make for a larger RMSE, as explained, and movies with only several reviews will be more obscure films reviewed by possibly extra cranky or extra friendly users, creating outliers. At the end of this document, in an addendum, I will present my findings for removing a range of film values - from 0 to 1000. 
-
 Seven (7) models will be developed, ranging from the most naive to the most complex. These will be tested and compared using the resulting RMSE in order to assess their quality.  The ideal evaluation criteria for this project, as specified by the assignment, is a RMSE that is expected to be lower than **`r threshold_value`**.
 
 After evaluating every available algorithm I have come up with using the RMSE, the best-resulting model will be used on the **validation dataset** to evaluate the quality of the predictions of the movie ratings.
@@ -80,7 +80,7 @@ A fair amount of data manipulation has been done to the datasets created with th
 * **New Field** : Creating a field called **age_of_movie**, by subtracting the year the film was released from the year parameter of the current date
 * **New Field** : Creating a field called **rating_year** by extracting the rating year from the **rating_date** field.
 * Removing the year from the movie title
-* Removing films with **350 reviews or less** - this shows to have made a slight difference over using the data as-is.
+* Removing films with **3 reviews or less**.
 * Removing the parentheses from the **release_year** and converting it to a numerical field
 * As provided, the film genres are provided as a string separated by "|". Therefor, I further manipulate the movielens dataset (and significantly increase its size) by extracting out the film genres, and creating a line per film, per genre
 * After the data wrangling is complete, the dataset is split up into :
@@ -89,80 +89,23 @@ A fair amount of data manipulation has been done to the datasets created with th
   + **A testing dataset** - the data the intermediate algorithms will be tested on
 
 
-```{r intro, echo = TRUE, message = TRUE, warning = FALSE, results='hide', cache=TRUE, include=FALSE}
-
-
-if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
-if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
-if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
-if(!require(hexbin)) install.packages("hexbin", repos = "http://cran.us.r-project.org")
-if(!require(stringr)) install.packages("stringr", repos = "http://cran.us.r-project.org")
-if(!require(lubridate)) install.packages("lubridate", repos = "http://cran.us.r-project.org")
-if(!require(ggrepel)) install.packages("ggrepel", repos = "http://cran.us.r-project.org")
-if(!require(ggplot2)) install.packages("ggplot2", repos = "http://cran.us.r-project.org")
-if(!require(cowplot)) install.packages("cowplot", repos = "http://cran.us.r-project.org")
-if(!require(dplyr)) install.packages("dplyr", repos = "http://cran.us.r-project.org")
-if(!require(here)) install.packages("here", repos = "http://cran.us.r-project.org")
-if(!require(formatR)) install.packages("here", repos = "http://cran.us.r-project.org")
-
-
-library(tidyverse)
-library(caret)
-library(data.table)
-library(stringr)
-library(lubridate)
-library(ggrepel)
-library(ggplot2)
-library(cowplot)
-library(dplyr)
-library(here)
-library(formatR)
-
-dl <- tempfile()
-marinas_directory = "/Users/marina/Documents/DevProjects/R/projects/r_final_harvard_data_science_project"
-
-#specifying not needing to download the .zip file if located on personal computer
-if (file.exists(marinas_directory)){
-  setwd(marinas_directory)
-}
-
-if (file.exists("ml-10m.zip")) {
-  
-  file.link("./ml-10m.zip", dl)
-} else {
-  #only download the file if it doesn't exist in the current working directory.
-  download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
-}
-
-ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
-                 col.names = c("userId", "movieId", "rating", "timestamp"))
-
-movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
-colnames(movies) <- c("movieId", "title", "genres")
-
-# if using R 4.0 or later
-#mutate to add the "release_year" column, format it as a numeric, and remove the (year) pattern from the title 
-
-movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
-                                           title = as.character(title),
-                                           genres = as.character(genres)) %>%
-  mutate(release_year =  str_extract(title, "(\\(\\d{4}\\)$)") ) %>%
-  mutate(release_year = as.numeric(str_remove(str_remove(release_year, "[\\(]"), "[\\)]")) ,
-         title = str_trim(str_remove(title, "\\(\\d{4}\\)$")))
-
-#add in ratings average per movie
-rating_avgs <- ratings %>% group_by(movieId) %>% summarise(avg_rating = mean(rating), rating_count = n())
-
-ratings <- inner_join(ratings, rating_avgs, by = "movieId")
-
-# add the date field , converting the timestamp to an actual date, and rounding to the nearest day
-#use inner_join instead of provided left_join to make sure the movie titles and genres are populated
-movielens <- inner_join(ratings, movies, by = "movieId") %>% 
-  mutate(rating_date = round_date(as_datetime(timestamp), unit="day"),
-         age_of_movie =  year(as_date(Sys.Date())) - release_year,
-         rating_year = year(rating_date))
-
+```{r, libraries, echo=FALSE, include=FALSE, results='hide', warning=FALSE}
 ```
+
+```{r eval=TRUE, cache=FALSE, echo=FALSE, include=FALSE, results='hide', warning=FALSE}
+if (file.exists(marinas_directory)){
+  print("directory exists!")
+  setwd(marinas_directory)
+  print(getwd())
+} 
+repo <- getwd()
+archivist::setLocalRepo(repo)
+hash <- archivist::searchInLocalRepo("name:movielens")
+archivist::loadFromLocalRepo(hash)
+hash <- archivist::searchInLocalRepo("name:rating_avgs")
+archivist::loadFromLocalRepo(hash)
+```
+\pagebreak
 
 I will re-iterate that the algorithm development and tuning will be conducted on one part of the data, and the validation set will be used to evaluate the final chosen data model. **During no other time will the validation dataset be used.**
 
@@ -184,43 +127,38 @@ After massaging the data a bit, the following fields were added, as derived from
 * **rating_year**
 * **rating_count**
 
+\pagebreak
 
 Per row, this is a representation of one user's rating of a single movie. As you can tell, the **genres** per film are currently combined into **"|"**-delimited string, which I will later separate. 
 **As a first glance, here's a snapshot of dataset:**
 
-```{r, head, echo = TRUE, tidy=TRUE, cache=TRUE}
-str(movielens)
-```
-
-**The first few lines of the dataset look like this:**
-
-```{r, head2, echo = TRUE, tidy=TRUE, cache=TRUE}
-head(movielens) %>%
-  print.data.frame()
+```{r, summary_movielens, echo=FALSE}
 ```
 \pagebreak
-**A summary of the subset confirms that there are no missing values.**
+**The first few lines of the dataset look like this:**
 
-```{r movie_summary, include=FALSE, echo = TRUE, tidy=TRUE, cache=TRUE}
-summary(movielens)
+```{r,  echo = FALSE, tidy=TRUE}
+head(movielens) %>%  print.data.frame()
 ```
 
-```{r data_summary ,include=FALSE, echo = TRUE, tidy=TRUE, cache=TRUE}
+**A summary of the subset confirms that there are no missing values.**
+```{r  echo=FALSE}
 data_summary <- movielens %>% 
   summarize(n_users = n_distinct(userId), n_movies = n_distinct(movieId))
 ```
 
-The total of unique movies and users in the movielens subset is **`r format(data_summary$n_users, big.mark = ",")`** unique users and **`r  format(data_summary$n_movies, big.mark = ",")`** different movies:**
+The total of unique movies and users in the movielens subset is **`r format(data_summary$n_users, big.mark = ",")`** unique users and **`r  format(data_summary$n_movies, big.mark = ",")`** different movies:
 
-```{r data_summary2 , echo = TRUE, tidy=TRUE, cache=TRUE, include=FALSE}
+```{r   echo = FALSE, tidy=TRUE, cache=TRUE}
 print(data_summary)
 ```
 If every user rated every movie, we would have **`r format(data_summary$n_users * data_summary$n_movies, big.mark = ",")`** rows; however, we only have this many rows:
 
-```{r nrows_movies, cache=TRUE}
+```{r echo = FALSE}
 nrow(movielens)
 ```
 Therefor, the database is fairly **sparsely populated**. I will visualize this later in the document.
+\pagebreak
 
 # Methods and Analysis
 
@@ -228,7 +166,7 @@ Therefor, the database is fairly **sparsely populated**. I will visualize this l
 
 ### Sparsity
 
-```{r percent_populated, echo = TRUE, cache=TRUE} 
+```{r percent_populated, echo = FALSE} 
 percent_populated <- (nrow(movielens)/
                         (data_summary$n_users* data_summary$n_movies)) * 100
 print(percent_populated)
@@ -238,114 +176,62 @@ As noted, if every user rated every movie, we would have approximately **`r form
 
 Visually, we can show the sparseness on a small sample of the data, with the following image graph:
 
-```{r populated_graph, echo = TRUE, fig.align='left', cache=TRUE} 
-users <- sample(unique(movielens$userId), 100)
-rafalib::mypar()
-movielens %>% filter(userId %in% users) %>% 
-  select(userId, movieId, rating) %>%
-  mutate(rating = 1) %>%
-  spread(movieId, rating) %>% select(sample(ncol(.), 100)) %>% 
-  as.matrix() %>% t(.) %>%
-  image(1:100, 1:100,. , 
-        xlab="Movies", ylab="Users", col="blue", 
-        main="Sparsely Populated Ratings Sample, Movies vs. Users")
-abline(h=0:100+0.5, v=0:100+0.5, col = "grey") 
+```{r  fig.align='left', echo=FALSE, include=FALSE, results='hide'} 
+#load the plot from memory
+hash <- archivist::searchInLocalRepo("name:sample_users")
+loadFromLocalRepo(hash)
 ```
+
+```{r, sparse_plot, echo=FALSE}
+```
+
 \pagebreak
 ### Users
 Summarizing the users in the system, we have users with **a minimum of 20 reviews**; however, the maximum is **> 7000 reviews** per user.
 
-```{r user_reviews_range, echo = TRUE, warning=FALSE, message=FALSE, tidy=TRUE, cache=TRUE} 
-users <- movielens %>% group_by(userId) %>% summarize(n = n(), avg_user_rating = mean(rating))
-
-summary(users)
+```{r, echo=FALSE, include=FALSE, results='hide'}
+hash <- archivist::searchInLocalRepo("name:users")
+loadFromLocalRepo(hash)
+hash <- archivist::searchInLocalRepo("name:users_summary")
+loadFromLocalRepo(hash)
 ```
+
 
 Viewing the ratings' density distribution, **it is obvious that most of the ratings come from a small percentage of users**:\newline
 
-```{r user_density_distribution, echo = TRUE, cache=TRUE} 
-users %>%
-  ggplot(aes(n)) + 
-  geom_density(fill = "blue", color="black") + 
-  scale_x_log10() + xlab("Long 10 User Count") +
-  ggtitle("Users log10 Density Distribution")
+```{r user_density_distribution, echo=FALSE, warning=FALSE, results='hide'} 
 ```
 
-\pagebreak
+If we examine the trends in the amount of ratings a user submits, versus the average rating, per user, we can clearly see that users with smaller amounts of ratings are much more likely to give extreme ratings on either side of the scale - be either very cranky (and give a rating of .5) or extra optimistic (and give a rating of 5). In the plots below I show the difference in the variability of user's average rating trends vs. the amount of ratings they have submitted.\newline
 
-If we examine the trends in the amount of ratings a user submits, versus the average rating, per user, we can clearly see that users with smaller amounts of ratings are much more likely to give extreme ratings on either side of the scale - be either very cranky (and give a rating of .5) or extra optimistic (and give a rating of 5). In the plots below I show the difference in the variability of user's average rating trends vs. the amount of ratings they have submitted. **By omitting users with 100 reviews or less**, we limit the crankiness of the users slightly.\newline
-
-```{r user_avg_rating, echo = TRUE, warning=FALSE, message=FALSE, cache=TRUE} 
-g1 <- users %>%
-  ggplot(aes(n, avg_user_rating)) + 
-  geom_point(color="blue", alpha=.3) + 
-  xlab("Ratings Per User") +ylab("Avg Rating") + geom_smooth(color='red') +
-  ggtitle("Ratings Count vs. Mean Rating") + scale_y_continuous(limits = c(0, 5)) +
-  theme(legend.position = "none", plot.title = element_text(size = 11, face="bold")) 
-
-g2 <- users %>% filter(n > 100) %>%
-  ggplot(aes(n, avg_user_rating)) + 
-  geom_point(color="blue", alpha=.3) + 
-  xlab("Ratings Per User") +ylab("Avg Rating") + geom_smooth(color='red') +
-  ggtitle("Ratings Count > 100 vs. Mean Rating")+ scale_y_continuous(limits = c(0, 5)) +
-  theme(legend.position = "none", plot.title = element_text(size = 11, face="bold")) 
-
-plot_grid(g1, g2)
-
-bigger_users <- users %>% filter(n > 100)
-movielens <- subset(movielens, (userId %in% bigger_users$userId))
-
+```{r users_4_graphs , echo=FALSE} 
 ```
+
 \pagebreak
 
 ### Movies
 
-We can also show that **each movie is not rated with the same frequency**; That is, the popular movies will be seen by many more people and will therefor be rated by many more people. Meanwhile, there are also many independent films that will only be seen by a few people, and therefor will only be rated by a small percentage of those.\newline\newline
-```{r movie_histogram, echo = TRUE, warning=FALSE, message=FALSE, cache=TRUE} 
-movielens %>%  group_by(movieId) %>% summarise(n = n()) %>%
-  ggplot(aes(n)) + 
-  geom_histogram(fill = "blue", color="black", bins = 40) +
-  scale_x_log10() + xlab("Log10 Rating Count Per Movie") +
-  ggtitle("Movie Ratings With log10 Density Distribution")
+We can also show that **each movie is not rated with the same frequency**; That is, the popular movies will be seen by many more people and will therefor be rated by many more people. Meanwhile, there are also many independent films that will only be seen by a few people, and therefor will only be rated by a small percentage of those.\newline
+
+```{r movie_histogram, include=TRUE} 
 ```
+
 \pagebreak
 
-The **users** data came with a specifications that **only users with 20 or more reviews are included**; however, no similar filtering was done for movies. If we examine the data, we can see that the variability of average film ratings is very high when the number of ratings is low, and it decreases steadily as the rating counts get into the hundreds and then thousands. This trend makes sense if we consider that an obscure film will only be seen by a small audience that may be biased for or against it, making for an an unusual amount of outlier ratings. As the film is seen by more people, it will get rated by more people, and the variability of those ratings will change as well. If we remove films with **< then 350 reviews**, this narrows the variability somewhat.  The plots below will show what I mean:\newline
+The **users** data came with a specifications that **only users with 20 or more reviews are included**; however, no similar filtering was done for movies.  While working on this project, I have found that if the dataset includes movies with 3 reviews or less, the **```createDataPartition {caret}```** function splits up the data in a way that will keep some of the movies in the testing set and some in the training set. The documentation states : 
 
-```{r rating_grid_showing_trends, echo = TRUE, warning = FALSE, message = FALSE, cache=TRUE}
-g1 <- rating_avgs %>% ggplot(aes(rating_count, avg_rating)) + geom_point(color='blue', alpha=.5) + 
-  geom_smooth(aes(color='red')) + xlab("Cumulative Ratings Per Movie") + 
-  ylab("Average Movie Rating") + ggtitle("Ratings Variability") + 
-  scale_y_continuous(limits = c(0, 5)) + 
-  theme(legend.position = "none", plot.title = element_text(size = 11, face="bold")) 
+```Also, for createDataPartition, very small class sizes (<= 3) the classes may not show up in both the training and test data```
 
-g2 <- rating_avgs %>% filter(rating_count > 350) %>%
-  ggplot(aes(rating_count, avg_rating)) + geom_point(color='blue', alpha=.5) + 
-  geom_smooth(aes(color='red')) + xlab("Cumulative Ratings Per Movie") + 
-  ylab("Average Movie Rating") + ggtitle("Ratings Variability") + 
-  ggtitle("Ratings Variability in films with > 350 ratings") +
-  scale_y_continuous(limits = c(0, 5))+ 
-  theme(legend.position = "none", plot.title = element_text(size = 11, face="bold")) 
-  
-plot_grid(g1, g2)
+This particular quirk sets up the dataset so that the ```inner_join``` function used in the regularization sections returns NA values for these movies, making the RMSE calculations invalid. Therefor, I have removed the entries for movies that have 3 reviews or less, excluding some 30 ratings.  If we examine the data, we can see that the variability of average film ratings is very high when the number of ratings is low, and it decreases steadily as the rating counts get into the hundreds and then thousands. This trend makes sense if we consider that an obscure film will only be seen by a small audience that may be biased for or against it, making for an an unusual amount of outlier ratings. As the film is seen by more people, it will get rated by more people, and the variability of those ratings will change as well. The plots below shows the variability of ratings when movies with less then 100 ratings are removed; We repeat the same with 200, and 300 cumulative ratings.  The plots below will show what I mean:\newline
 
+```{r ratings_4_graphs, echo=FALSE, warning=FALSE, message=FALSE}
 ```
 
-The data shows that by removing the films with fewer reviews, we remove most of the extreme outliers of the **0.5** AND **5** average movie ratings. In general, the data also shows that movies with fewer ratings have a much higher variability in average movie ratings.  I believe that movies that have only a few reviews are outliers, and so should be excluded from the training data. Therefor, below, I include only the films with **more then 350 reviews**.
-```{r bigger_films, echo = TRUE, message=FALSE, warning=FALSE, cache=TRUE} 
-bigger_films <- movielens %>% group_by(movieId) %>% summarise(n = n()) %>% filter(n > 350)
-movielens <- subset(movielens, (movieId %in% bigger_films$movieId))
-```
-\pagebreak
+The data shows that by removing the films with fewer reviews, we remove most of the extreme outliers of the **0.5** AND **5** average movie ratings. In general, the data also shows that movies with fewer ratings have a much higher variability in average movie ratings.  
 
 ### Ratings
 
-```{r ratings_distributions, echo = TRUE, warning=FALSE, message=FALSE, cache=TRUE}
-movielens %>%
-  ggplot(aes(rating)) +  xlab("Movie Rating") + ylab("Cumulative Rating Count") +
-  geom_histogram(binwidth = 0.25, fill = "blue") +
-  scale_y_continuous(breaks = c(seq(0, 3000000, 500000))) +
-  ggtitle("Votes By Volume, Per Discrete Rating")
+```{r ratings_distributions, warning=FALSE, message=FALSE, echo=FALSE}
 ```
 
 From the data and the bar graph of the ratings, we can make one these conclusions: 
@@ -357,8 +243,8 @@ From the data and the bar graph of the ratings, we can make one these conclusion
 
 \pagebreak
 
-Plotting release year vs. avg movie ratings - it seems movies are either getting worse with time, or the reviewers are getting pickier.\newline
-```{r avg_rating_vs_year,  echo = TRUE, warning=FALSE, message=FALSE, cache=TRUE}
+Plotting release year vs. avg movie ratings - it seems movies are either getting worse with time, or the reviewers are getting pickier.\newline\newline
+```{r  echo=FALSE,  warning=FALSE, message=FALSE}
 movielens %>%
   ggplot(aes(release_year, avg_rating)) + 
   stat_bin_hex(bins = 100) + 
@@ -372,43 +258,17 @@ movielens %>%
 
 ### Genres
 
-Next in the data wrangling process, I will separate the genres from the combined, "|"-delimited values into separate genres, one entry per rating, per movie, per genre. We can now view the unique genres available in the system:
-```{r genre_separted,  echo = FALSE, warning=FALSE, message=FALSE, tidy=TRUE, cache=TRUE}
-#movielens <- movielens %>% separate_rows(genres, sep ="\\|")
-#genres <- movielens %>% separate_rows(genres, sep ="\\|") %>% unique(genres)
-#print(genres)
-#movies_by_genre <- movielens %>% separate_rows(genres, sep ="\\|") %>% group_by(genres) %>% summarize(count = n()) %>% arrange(count)
+If the current ```genres``` field is separated by the "|"-character, we can examine the individual genres a movie might fall into:
 
-movies_by_genre <- movielens %>% separate_rows(genres, sep ="\\|") %>% group_by(genres) %>% summarize(count = n(), avg_rating = mean(rating)) %>% arrange(count)
-
-print(unique(movies_by_genre$genres))
+```{r  echo=FALSE, include=FALSE, results='hide', message=FALSE}
+hash <- archivist::searchInLocalRepo("name:movies_by_genre")
+archivist::loadFromLocalRepo(hash)
 ```
 
-Next, we'll explore how ratings have fared over time by **genre**. Based on the visualizations provided here, it is fairly obvious that **most of the average ratings across genres have declined over the years**. The notable exception to this is **IMAX** movies, and in a small way, **Animation**. These trends make sense, as both IMAX and animated films have benefited greatly from technological advancements over the years.\newline\newline
-
-```{r genres_ratings_facet,  echo = TRUE, warning=FALSE, message=FALSE, cache=TRUE}
-movielens %>% na.omit() %>% separate_rows(genres, sep ="\\|") %>%
-  ggplot(aes(release_year, avg_rating)) + stat_bin_hex(bins = 100) + #scale_fill_distiller(palette = "PuBuGn") +
-  stat_smooth(method = "lm", color = "magenta", size = 1) +
-  ylab("Average Movie Rating") + xlab("Release Year") + ggtitle("Release Year vs Average Movie Ratings") +
-  facet_wrap(~genres) + theme(axis.text.x = element_text(angle = 90))     
+```{r print_genres_text, echo=FALSE}
 ```
-
-\pagebreak
-
-**The plot below shows the trends of how how many films get rated by **genre**. **
-
-```{r reviews_by_genre,  echo = TRUE, warning=FALSE, message=FALSE, cache=TRUE}
-#movies_by_genre <- movielens %>% separate_rows(genres, sep ="\\|") %>% 
-#  group_by(genres) %>% summarize(count = n()) %>% arrange(count)
-
-movies_by_genre %>% 
-  mutate(genres = factor(genres, levels = unique(as.character(genres)))) %>%
-  ggplot(aes(x = genres, y= count, fill=count)) + geom_bar( stat = "identity" ) +  
-  scale_y_continuous(n.breaks = 5, breaks = c(0,  1000000, 2000000, 3000000, 4000000), labels = c("0", "1,000,000", "2,000,000", "3,000,000", "4,000,000")) +
-  coord_flip() +
-  ggtitle("Total Reviews By Genre") + theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) 
-
+Below one can examine how genres generally tend to be reviewed, by volume:
+```{r print_movie_count_by_genre, echo=FALSE, fig.align='left'}
 ```
 
 **Do people tend to review certain genres more then others?**
@@ -416,22 +276,27 @@ movies_by_genre %>%
 The answer seems to be a resounding **YES**!\newline
 
 **Dramas** seems to have the most reviews, while **IMAX** has by far the least; this pattern makes sense, since only a small percentage of movies get released in IMAX (although the ones that are are super popular, and will thus get more reviews.)
+
 \pagebreak
+
+Next, we'll explore how ratings have fared over time by **genre**. Based on the visualizations provided here, it is fairly obvious that **most of the average ratings across genres have declined over the years**. The notable exception to this is **IMAX** movies, and in a small way, **Animation**. These trends make sense, as both IMAX and animated films have benefited greatly from technological advancements over the years.\newline\newline
+
+```{r genres_ratings_facet, echo=FALSE, warning=FALSE, message=FALSE}  
+```
+
+\pagebreak
+
+**The plot below shows the trends of how how many films get rated by **genre**. **
+
+```{r print_genres_totals, echo=FALSE, include=FALSE}
+hash <- archivist::searchInLocalRepo("name:total_reviews_by_genre")
+archivist::loadFromLocalRepo(hash)
+```
 
 **Ratings By Genre**
 
 In general, the average rating by genre can be shown on this plot; **Film Noir** seems to have the highest average rating, while **Horror** films have the lowest.
-```{r avg_rating_by_genre_plots,  echo = TRUE, warning=FALSE, message=FALSE, fig.align='left', cache=TRUE}
-#ratings_summary_by_genre <- movielens %>% separate_rows(genres, sep ="\\|") %>% 
-#      group_by(genres) %>% summarise(avg_rating = mean(rating)) 
-movies_by_genre %>% ggplot(aes(genres, avg_rating, size = 3, col=genres)) + 
-  geom_point() +   theme(axis.title.x=element_blank(), legend.title = element_blank(),
-                         axis.text.x=element_blank(), legend.key= element_blank(),
-                         axis.ticks.x=element_blank(), legend.text = element_blank(), legend.position="none") +
-  geom_label_repel(aes(label = genres),
-                   box.padding   = 0.35, 
-                   point.padding = 0.5,
-                   segment.color = "blue") + ggtitle("Average Rating By Genre") + ylab("Average Rating")
+```{r avg_rating_by_genre_plots, echo=FALSE, fig.align='left'}
 ```
 \pagebreak
 
@@ -439,41 +304,21 @@ movies_by_genre %>% ggplot(aes(genres, avg_rating, size = 3, col=genres)) +
 
 ### 1. Average movie rating model
 
-```{r data_separation_section_1,  echo = TRUE, warning=FALSE, message=FALSE, cache=TRUE}
-# Validation set will be 10% of MovieLens data
-set.seed(1, sample.kind="Rounding")
-test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
-edx <- movielens[-test_index,]
-temp <- movielens[test_index,]
-
-# Make sure userId and movieId in validation set are also in edx set
-validation <- temp %>% 
-  semi_join(edx, by = "movieId") %>%
-  semi_join(edx, by = "userId")
-
-# Add rows removed from validation set back into edx set
-removed <- anti_join(temp, validation)
-edx <- rbind(edx, removed)
-
-#remove all the objects from memory
-rm(dl, ratings, movies, test_index, temp, removed, movielens )
-
-#RMSE function imlpementation
+```{r dayta_loading, echo=FALSE, include=FALSE, results='hide'}
+hash <- archivist::searchInLocalRepo("name:validation")
+archivist::loadFromLocalRepo(hash)
 ```
 
 Earlier in the document I described the logic behind the RMSE function. Here I am enclosing it's implementation in R.
 
-```{r rmse_formula,  echo = TRUE, warning=FALSE, cache=TRUE}
-RMSE <- function(true_ratings, predicted_ratings){
-  sqrt(mean((true_ratings - predicted_ratings)^2))
-}
+```{r rmse_formula}
 ```
 
-```{r test_train_break,  echo = TRUE, warning=FALSE, cache=TRUE}
-#splitting the edx data set into testing and training , making sure to exclude the validation data created before.
-test_index <- createDataPartition(y = edx$rating, times = 1, p = 0.15, list = FALSE)
-train_set <- edx[-test_index,]
-test_set <- edx[test_index,]
+```{r test_train_data_reload, echo=FALSE, include=FALSE, results='hide'}
+hash <- archivist::searchInLocalRepo("name:train_set")
+archivist::loadFromLocalRepo(hash)
+hash <- archivist::searchInLocalRepo("name:test_set")
+archivist::loadFromLocalRepo(hash)
 ```
 
 
@@ -481,19 +326,11 @@ To start out, we will examine the **mean rating**, and use that as the benchmark
 $$Y_{u,i} = \mu  + \varepsilon_{u,i}$$
 $Y_{u,i}$ is the predicted rating per user, per movie and $\mu$ is the estimate that minimizes the root mean squared error — is the average rating of all movies across all users. The code below calculates $\mu$ on the training set of the data, and then uses the RMSE to predict the error of ratings of the test set.
 
-```{r mu_hat,  echo = TRUE , cache=TRUE}
-mu_hat <- mean(train_set$rating)
-print(mu_hat)
-
-naive_rmse <- RMSE(test_set$rating, mu_hat)
-rmse_results <- tibble(method = "Just the average", RMSE = naive_rmse)
-
-```
-
 This value will be used with the RMSE function to test the accuracy with most naive version of the algorithm.
 
-```{r rmse_output_1, echo = TRUE , cache=TRUE}
-rmse_results %>% knitr::kable(row.names=TRUE)
+```{r , echo=FALSE, include=FALSE, results='hide'}
+hash <- archivist::searchInLocalRepo("name:rmse_results_output_0")
+archivist::loadFromLocalRepo(hash)
 ```
 
 As I continue with the project, I will add the results of the RMSE of every model I test to the **```rmse_results```** variable, and print out the table as I have above - so that the data can be reviewed as the project progresses.\newline
@@ -510,68 +347,32 @@ $$b_{i} =  Y_{u,i} - \mu  - \varepsilon _{u,i}$$
 
 And run the RMSE algorithm on the test set again. The predictions improve significantly when we use this model, as shown below.
 
-```{r minus_mu_minus_bi,  echo = TRUE, warning=FALSE, message=FALSE , cache=TRUE}
-mu <- mean(train_set$rating) 
-movie_avgs <- train_set %>% 
-  group_by(movieId) %>% 
-  summarize(b_i = mean(rating - mu)) #here we're calculating the b_i, avg bias per movie 
-
-predicted_ratings <- mu + test_set %>% 
-  left_join(movie_avgs, by='movieId') %>%
-  pull(b_i)
-
-model_1_rmse <- RMSE(test_set$rating, predicted_ratings)
-
-#get the RMSE results from from the b_i predective model
-tmp_rmse_results <- tibble(method = "Movie Effect Model", RMSE = model_1_rmse)
-
-#add to existing rmse results table
-rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
-rmse_results %>% knitr::kable(row.names=TRUE)
+```{r , echo=FALSE, include=FALSE, results='hide'}
+hash <- archivist::searchInLocalRepo("name:rmse_results_output_1")
+archivist::loadFromLocalRepo(hash)
+hash <- archivist::searchInLocalRepo("name:model_1_rmse")
+archivist::loadFromLocalRepo(hash)
 ```
 
 Adding a single **movie effect** to the model not only significantly reduces the RMSE to **`r model_1_rmse`**, but brings it below 1.0, which is a great first step. However, the number is still not low enough, so we continue on.
-\pagebreak
 
 ### 3. Movie and user effect model
 
-We compute the user bias **$b_{u}$** per user, for those that have rated **over 100 movies**. Some users are cranky, and others are optimistic - so the Effect of the user's crankiness can change the ratings in either direction, positive or negative. The formula for the predicted rating would then be, building on what we have already seen in models 1 and 2 above:
+We compute the user bias **$b_{u}$** per user. Some users are cranky, and others are optimistic - so the Effect of the user's crankiness can change the ratings in either direction, positive or negative. The formula for the predicted rating would then be, building on what we have already seen in models 1 and 2 above:
 
 $$Y_{u,i} = \mu + b_{i} + b_{u} + \epsilon_{u,i}$$
 
 We compute an approximation by computing $\mu$ and $b_{i}$, and estimating  $b_{u}$, as the average of 
 $$b_{u} = Y_{u,i} - \mu - b_{i} - \epsilon_{u,i}$$
 
-```{r minus_mu_minus_bi_minus_bu, echo = TRUE, echo = TRUE, warning=FALSE, message=FALSE, cache=TRUE}
-
-#Now we will add in the user bias, b_u
-user_avgs <- train_set %>% 
-  left_join(movie_avgs, by='movieId') %>%
-  group_by(userId) %>%
-  summarize(b_u = mean(rating - mu - b_i)) #here, we're calculating the bias per movie, per user
-
-
-predicted_ratings <- test_set %>% 
-  left_join(movie_avgs, by='movieId') %>%
-  left_join(user_avgs, by='userId') %>%
-  mutate(pred = mu + b_i + b_u) %>%
-  pull(pred)
-
-model_2_rmse <- RMSE(predicted_ratings, test_set$rating)
+```{r , echo=FALSE, include=FALSE, results='hide'}
+hash <- archivist::searchInLocalRepo("name:rmse_results_output_2")
+archivist::loadFromLocalRepo(hash)
 ```
-The RMSE on this third model we're evaluating comes out to **`r model_2_rmse`**, and is already below the required threshold level of **`r threshold_value`**. The results table is now updated with the latest RMSE:  
 
-```{r minus_mu_minus_bi_minus_bu_1, echo = TRUE, echo = TRUE, warning=FALSE, message=FALSE, cache=TRUE}
-tmp_rmse_results <- tibble(method = "User Effect + Movie Effect Model", RMSE = model_2_rmse)
-
-#add to existing rmse results table
-rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
-rmse_results %>% knitr::kable(row.names=TRUE)
-```
-\pagebreak
 ### 4. Regularized Models
 
-So far we have been computing estimates with certain levels of uncertainty, but we have not been taking into accounts that problems may exist in the data where there is not enough information. There is always a risk of over-fitting the data, and to reduce this risk, we introduce the concept of **regularization**. Regularization will allow us to use a tuning parameter, $\lambda$, that when included in the calculation will minimize the mean squared error. This will reduce the $b_{i}$ and $b_{u}$ in case of small number of ratings. (Remember that we're using movies with cumulative ratings count of over 100, but this is still not that many, all things considered.)
+So far we have been computing estimates with certain levels of uncertainty, but we have not been taking into accounts that problems may exist in the data where there is not enough information. There is always a risk of over-fitting the data, and to reduce this risk, we introduce the concept of **regularization**. Regularization will allow us to use a tuning parameter, $\lambda$, that when included in the calculation will minimize the mean squared error. This will reduce the $b_{i}$ and $b_{u}$ in case of small number of ratings. 
 
 Since I am attempting to narrow down a $\lambda$ value quite frequently during this project over various models, I have created a function that will be used to create, calculate, plot, and narrow down the lambda range for each model I attempt to train. 
 
@@ -582,36 +383,7 @@ The function takes in parameters for the start and end of the range of the $\lam
 
 #### 4.1 Movie Effect Regularized Model
 
-```{r lambdas, echo = TRUE,  warning=FALSE, message=FALSE, cache=TRUE}
-#function that will create the loose labmdas, and then come up with a more 
-#detailed lambda evaluation when we have an idea where the lowest value is
-find_generic_lambda <- function(seq_start, seq_end, seq_increment, FUN, 
-    detailed_flag = FALSE, training_set, testing_set, plot_title="")
-{
-  lambdas <- seq(seq_start, seq_end, seq_increment)
-  RMSE <- sapply(lambdas, FUN)
-  #find the smallest lamdba
-  print(qplot(lambdas, RMSE, main=plot_title))
-  #saving the first round lambda 
-  min_lambda_first_try <- lambdas[which.min(RMSE)]
-  
-  if (detailed_flag) #this flag signifies where the function 
-    #will call itself recursively
-  {
-    #if this is the first iteration of the function, continue with taking 
-    #a slightly lower % and silghtly higher % lambda value range to iterate 
-    #through new lambdas that are much more granuluar, with increments at
-    #10% of what they were previously.
-    new_lambda_range = (seq_end - seq_start)/40
-    min_lambda_first_try <- find_generic_lambda(seq_start = 
-            min_lambda_first_try - new_lambda_range, 
-            seq_end = min_lambda_first_try + new_lambda_range, 
-           seq_increment = seq_increment/10, FUN, detailed_flag = FALSE, 
-           training_set = training_set, testing_set = testing_set, 
-           plot_title = paste("Narrowed Range: ", plot_title))
-  }
-  return (min_lambda_first_try)
-}
+```{r find_generic_lambda, eval=FALSE}
 ```
 
 
@@ -626,38 +398,15 @@ where  $n_i$ is the number of ratings made for movie i. When the sample size is 
 
 $\lambda$ is a tuning parameter, and we use cross-validation to choose the correct lambda for each case we decide to plug in regularization into. This, in essence, is what the function **find_generic_lambda** shown above is all about. 
 
-```{r regularized_rmse_3, echo = TRUE, warning=FALSE, message=FALSE, cache=TRUE}
-regularized_rmse_3 <- function(l, training_set, testing_set)
-{
-  #print(l)
-  mu <- mean(training_set$rating)
-  just_the_sum <- training_set %>% 
-    group_by(movieId) %>% 
-    summarize(s = sum(rating - mu), n_i = n())
-  
-    predicted_ratings <- testing_set %>% 
-    left_join(just_the_sum, by='movieId') %>% 
-    mutate(b_i = s/(n_i+l)) %>%
-    mutate(pred = mu + b_i) %>%
-    pull(pred)
-    
-    l_rmse <- RMSE(predicted_ratings, testing_set$rating)
-    #print(l_rmse)
-    return (l_rmse)
-}
+```{r regularized_rmse_3, eval=FALSE}
+```
 
-#testing out the regularization with lamdba - 
-rmse3_lambda <- find_generic_lambda(seq_start=-2, seq_end=10, 
-    seq_increment=0.5, 
-    FUN= function(x) regularized_rmse_3(x, train_set, test_set ), 
-    detailed_flag = TRUE, training_set=train_set, testing_set=test_set, 
-    plot_title = "Testing Lambdas for Movie Effect")
 
-rmse_3 <- regularized_rmse_3(rmse3_lambda, train_set, test_set)
-tmp_rmse_results <- tibble(method = "Regularized + Movie Effect", RMSE = rmse_3)
-#add to existing rmse results table
-rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
-rmse_results %>% knitr::kable(row.names=TRUE)
+```{r  , echo=FALSE, include=FALSE, results='hide'}
+hash <- archivist::searchInLocalRepo("name:rmse_results_output_3")
+archivist::loadFromLocalRepo(hash)
+hash <- archivist::searchInLocalRepo("name:rmse_3")
+archivist::loadFromLocalRepo(hash)
 ```
 
 The function **```regularized_rmse_3```**  was passed as a parameter into the **```find_generic_lambda```** function described above, and will produce the RMSE for the regularized movie effect model. It is of note that the result of this is only slightly better then the non-regularized Movie Effect model (model # 2) and significantly worse then the non-regularized model # 3. Moreover, an RMSE of **`r rmse_3`** it no longer fits the criteria of being **< `r threshold_value`**. Therefor, the search for a fitting RMSE continues.
@@ -672,46 +421,14 @@ This time, the formula we will follow is, with $b_u$ as the user Effect:
 
 $$\frac{1}{N} \sum_{u,i} \left(y_{u,i} - \mu - b_i - b_u \right)^2 + \lambda \left(\sum_{i} b_i^2 + \sum_{u} b_u^2\right)$$ 
 
-```{r regularized_movie_and_user, echo = TRUE, warning=FALSE, message=FALSE, cache=TRUE}
-regularized_movie_and_user <- function(l, training_set, testing_set)
-{
-  
-  #print(l)
-  mu <- mean(training_set$rating)
-  
-  b_i <- training_set %>% 
-    group_by(movieId) %>%
-    summarize(b_i = sum(rating - mu)/(n()+l))
-  
-  b_u <- training_set %>% 
-    left_join(b_i, by="movieId") %>%
-    group_by(userId) %>%
-    summarize(b_u = sum(rating - b_i - mu)/(n()+l))
-  
-  predicted_ratings <- 
-    testing_set %>% 
-    left_join(b_i, by = "movieId") %>%
-    left_join(b_u, by = "userId") %>%
-    mutate(pred = mu + b_i + b_u) %>%
-    pull(pred)
-  
-  return(RMSE(predicted_ratings, test_set$rating))
-}
+```{r regularized_movie_and_user, eval=FALSE}
+```
 
-rmse4_lambda <- find_generic_lambda(seq_start=0, seq_end=10, 
-      seq_increment=0.5, 
-      FUN= function(x) regularized_movie_and_user(x, training_set=train_set, 
-                                                  testing_set=test_set ), 
-      detailed_flag = TRUE, training_set=train_set, 
-      testing_set=test_set, 
-      plot_title = "Testing Lambdas for Movie Effect and User Bias Effect")
-
-rmse_4 <- regularized_movie_and_user(rmse4_lambda, train_set, test_set)
-tmp_rmse_results <- tibble(method = "Regularized Movie + User Effect Model", 
-                           RMSE = rmse_4)
-#add to existing rmse results table
-rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
-rmse_results %>% knitr::kable(row.names=TRUE)
+```{r , echo=FALSE, include=FALSE, results='hide'}
+hash <- archivist::searchInLocalRepo("name:tmp_rmse_results_4")
+archivist::loadFromLocalRepo(hash)
+hash <- archivist::searchInLocalRepo("name:rmse_4")
+archivist::loadFromLocalRepo(hash)
 ```
 It seems like the regularization model with both user and movie effects works very well with the RMSE, and even performed slightly better then the current winner,  **the user Effect + movie effect model**. But is an even better approach possible? I will next attempt to add the film's release year into the mix and examine whether this will help making the predictions more accurate.
 \pagebreak
@@ -725,56 +442,16 @@ $$\frac{1}{N} \sum_{u,i} \left(y_{u,i} - \mu - b_i - b_u - b_y \right)^2 + \lamb
 
 with $b_y$ as the **release year effect**. 
 
-```{r regularized_movie_and_user_and_year, echo = TRUE, warning=FALSE, message=FALSE, cache=TRUE}
-regularized_movie_and_user_and_year <- function(l, training_set, testing_set)
-{
-  mu <- mean(training_set$rating)
-  
-  b_i <- training_set %>% 
-    group_by(movieId) %>%
-    summarize(b_i = sum(rating - mu)/(n()+l))
-  
-  b_u <- training_set %>% 
-    left_join(b_i, by="movieId") %>%
-    group_by(userId) %>%
-    summarize(b_u = sum(rating - b_i - mu)/(n()+l))
-  
-  b_y <- training_set %>% 
-    left_join(b_i, by='movieId') %>%
-    left_join(b_u, by="userId") %>%
-    group_by(age_of_movie) %>%
-    summarize( b_y = sum(rating - b_i - b_u - mu)/(n()+l))
-  
-  predicted_ratings <- 
-    testing_set %>% 
-    left_join(b_i, by = "movieId") %>%
-    left_join(b_u, by = "userId") %>%
-    left_join(b_y, by = "age_of_movie") %>%
-    mutate(pred = mu + b_i + b_u + b_y) %>%
-    pull(pred)
- 
-  rmse <- RMSE(predicted_ratings, testing_set$rating)
-  return(rmse)
-}
+```{r regularized_movie_and_user_and_year, eval=FALSE}
+```
 
-model_5_lamdba <- find_generic_lambda(seq_start=0, seq_end=10, 
-    seq_increment=0.5, 
-    FUN= function(x) regularized_movie_and_user_and_year(x, 
-              training_set=train_set, testing_set=test_set ), 
-    detailed_flag = TRUE, training_set=train_set, 
-    testing_set=test_set, plot_title = 
-    "Testing Lambdas for Movie Effect, User Bias Effect and Film Year Effect")
-model_5_rmse <- 
-  regularized_movie_and_user_and_year(model_5_lamdba, train_set, test_set)
-tmp_rmse_results <- 
-  tibble(method = "Regularized Movie + User + Year Effect Model", 
-         RMSE = model_5_rmse)
-#add to existing rmse results table
-rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
-rmse_results %>% knitr::kable(row.names=TRUE)
+```{r , echo=FALSE, include=FALSE, results='hide'}
+hash <- archivist::searchInLocalRepo("name:rmse_results_output_5")
+archivist::loadFromLocalRepo(hash)
+hash <- archivist::searchInLocalRepo("name:model_5_rmse")
+archivist::loadFromLocalRepo(hash)
 ```
 The added year does indeed seem to have made a difference in the calculations; The next item to be tested is the genre. 
-\pagebreak
 
 #### 4.4 Movie + User + Release Year + Genre Effect Regularized Model
 
@@ -782,83 +459,23 @@ Following the pattern of our previous regularized models, we add in $b_g$ to rep
 
 $$\frac{1}{N} \sum_{u,i} \left(y_{u,i} - \mu - b_i - b_u - b_y -b_g \right)^2 + \lambda \left(\sum_{i} b_i^2 + \sum_{u} b_u^2 + \sum_{i} b_y^2 + \sum_{i} b_g^2 \right)$$
 
-```{r regularized_movie_and_user_and_year_and_genre, echo = TRUE,  warning=FALSE, message=FALSE, cache=TRUE}
+```{r regularized_movie_and_user_and_year_and_genre, eval=FALSE}
+```
 
-regularized_movie_and_user_and_year_and_genre <- 
-  function(l, training_set, testing_set)
-{
-
-  mu <- mean(training_set$rating)
-  
-  b_i <- training_set %>% 
-    group_by(movieId) %>%
-    summarize(b_i = sum(rating - mu)/(n()+l))
-  
-  b_u <- training_set %>% 
-    left_join(b_i, by="movieId") %>%
-    group_by(userId) %>%
-    summarize(b_u = sum(rating - b_i - mu)/(n()+l))
-  
-  b_y <- training_set %>% 
-    left_join(b_i, by='movieId') %>%
-    left_join(b_u, by="userId") %>%
-    group_by(age_of_movie) %>%
-    summarize(b_y = sum(rating - b_i - b_u - mu)/(n()+l))
-  
-  #adding in the genre bias here
-  b_g <- training_set %>% 
-    left_join(b_i, by='movieId') %>%
-    left_join(b_u, by="userId") %>%
-    left_join(b_y, by="age_of_movie") %>%
-    group_by(genres) %>%
-    summarize( b_g = sum(rating - b_i - b_u - b_y - mu)/(n()+l))
-  
-  
-  predicted_ratings <- 
-    testing_set %>% 
-    left_join(b_i, by = "movieId") %>%
-    left_join(b_u, by = "userId") %>%
-    left_join(b_y, by = "age_of_movie") %>%
-    left_join(b_g, by = "genres") %>%
-    mutate(pred = mu + b_i + b_u + b_y + b_g) %>%
-    pull(pred)
-  
-  rmse <- RMSE(predicted_ratings, testing_set$rating)
- 
-  return(rmse)
-}
-
-model_6_lambda <- find_generic_lambda(seq_start=0, seq_end=10, 
-    seq_increment=0.5, FUN= function(x) 
-      regularized_movie_and_user_and_year_and_genre(x, 
-            training_set=train_set, testing_set=test_set ), 
-           detailed_flag = TRUE, training_set=train_set, 
-          testing_set=test_set, 
-    plot_title = 
-      "Testing Lambdas for Movie Effect, User Bias , 
-        Film Age And Genre Effect")
-
-model_6_rmse <- regularized_movie_and_user_and_year_and_genre(
-    model_6_lambda,  train_set, test_set)
-
-tmp_rmse_results <- tibble(method = 
-    "Regularized Movie + User + Year + Genre Effect Model",
-    RMSE = model_6_rmse)
-
-#add to existing rmse results table
-rmse_results <- bind_rows(rmse_results, tmp_rmse_results)
-rmse_results %>% knitr::kable(row.names=TRUE)
-rm(tmp_rmse_results)
+```{r, echo=FALSE, include=FALSE, results='hide'}
+hash <- archivist::searchInLocalRepo("name:rmse_results_output_6")
+archivist::loadFromLocalRepo(hash)
+hash <- archivist::searchInLocalRepo("name:model_6_rmse")
+archivist::loadFromLocalRepo(hash)
 ```
 \pagebreak
 # Results
 
 After creating a number of predictive algorithms, the best model as per the project requirements is the one with the least RMSE : **'Regularized Movie, User, Release Year and Genre Effect Model'**. Now that we've selected this model, it will be applied to the **validation data set** (which has been untouched as of yet).
 
-```{r regularized_movie_and_user_and_year_and_genre_validation, echo = TRUE,  warning=FALSE, message=FALSE, cache=TRUE}
-
-final_rmse <- regularized_movie_and_user_and_year_and_genre(model_6_lambda, 
-                      train_set, validation)
+```{r , echo=FALSE, include=FALSE, results='hide'}
+hash <- archivist::searchInLocalRepo("name:final_rmse")
+archivist::loadFromLocalRepo(hash)
 ```
 
 
@@ -867,21 +484,18 @@ final_rmse <- regularized_movie_and_user_and_year_and_genre(model_6_lambda,
 well below the required threshold of **`r threshold_value`**.
 We can now review the complete set of RMSE calculations :
 
-```{r regularized_movie_and_user_and_year_validation, echo = TRUE,  warning=FALSE, message=FALSE, cache=TRUE}
-final_rmse_results <- tibble(method = "Final Model Tested on Validation Set", 
-                           RMSE = final_rmse)
-
-#add to existing rmse results table
-rmse_results <- bind_rows(rmse_results, final_rmse_results)
-
-# The final output 
-rmse_results %>% knitr::kable(row.names=TRUE)
+```{r , echo=FALSE, include=FALSE, results='hide'}
+hash <- archivist::searchInLocalRepo("name:rmse_results")
+archivist::loadFromLocalRepo(hash)
 ```
 
-It is apparent from the numbers presented above that without regularization, simply applying Model #3, the
-**"User Effect + Movie Effect Model"** will actually give us an RMSE low enough to be acceptable, as the output of that model, **`r model_2_rmse`** is less then the threshold value of **`r threshold_value`**.\newline (A notable observation : these numbers were only acceptable after the data has been massaged to remove films that had too few ratings, and remove users who had less then 100 reviews.)
-However, I wanted to examine other options for improvement and introduced regularization into the models. The simplest regularization model, using only the movie affect with an optimized lambda, was not good enough for our calculations, and actually regressed from our third model, described above. However, regularization with movie AND user effect beat the previously best-performing model. Adding in the release year in model # 6 increased our performance even further, and finally, using regularization combined with the movie, user, release year and genre effects proved to be the most efficient model. 
+```{r regularized_movie_and_user_and_year_and_genre_validation_results_final_ouput, echo=FALSE}
+```
+
+It is apparent from the numbers presented above that without regularization we cannot achieve RMSE numbers less then the threshold value of **`r threshold_value`**.\newline 
+I wanted to examine options for improvement pf the algorithm and introduced regularization into the models. The simplest regularization model, using only the movie affect with an optimized lambda, was not good enough for our calculations, and actually regressed from our third model, described above. However, regularization with movie AND user effect beat the previously best-performing model. Adding in the release year in model # 6 increased our performance even further, and finally, using regularization combined with the movie, user, release year and genre effects proved to be the most efficient model. 
 **Applying this final model, #7, to the validation set, gave us a validated RMSE of `r final_rmse`**. 
+\pagebreak
 
 # Conclusion
 
@@ -905,7 +519,9 @@ The first term in the equation above is the mean squared error calculation , and
 
 The RMSE arrived at with this model is **`r final_rmse`** - which is sufficiently accurate, as it is lower than the initial evaluation criteria **`r threshold_value`** given by the goal of the present project.
 
-**It is worth noting that the current RMSE numbers were achieved after editing the data to remove users with less then 100 reviews, and movies with less then 350 reviews. Without removing this data, comprised of mostly outliers, the RMSE was a lot more accurate**. 
+**As mentioned above, due to the way the function ```createDataPartition``` works, movies with 3 reviews or less have been excluded from the dataset in order to prevent NA errors in the RMSE calculations.** 
+
+\pagebreak
 
 ## Other Options
 
