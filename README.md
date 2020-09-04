@@ -20,13 +20,13 @@ The following code was provided by the staff to serve as a starting point for th
 
 The project as a whole had a number of problems with it. 
 * the **archivist** package needs to be installed through **devtools::install_github("pbiecek/archivist")**
-* the data downloaded and processed by the code will be saved LOCALLY using the **archivist** package, and can be viewd in the same folder
+* the data downloaded and processed by the R code will be saved LOCALLY using the **archivist** package, and can be viewd in the same folder
   - **backpack.db** will hold the database information for the saved objects mentioned above
   - **gallery/** folder will hold the actual data objects saved by the project.
   - I am including a version of the **backpack.db** this github project.
-  - Unfortunately, the **gallery** folder was far too large , even in compressed form, to include in GitHub. Therefor, in order to run the .Rmd file and generate the pdf report for the project, **the final_project.R file will HAVE to be executed first**.
+  - Unfortunately, the **gallery** folder is far too large , even in compressed form, to include in GitHub. Therefor, in order to run the .Rmd file and generate the pdf report for the project, **the final_project.R file will HAVE to be executed first**.
   
-* **the movielens dataset was modified to exclude films that have 3 or less reviews, due to a glitch in the ```createDataPartition {caret} ``` function. As per the documentation of the  function, items in the set with 3 counts or less won't show up in both testing and training data. **
+* **the movielens dataset was modified to exclude films that have 3 or less reviews, due to intended functionality in the ```createDataPartition {caret} ``` function. As per the documentation of the  function, items in the set with 3 counts or less won't show up in both testing and training data. ** This quirk was wreaking havoc in the code and generating NA values from the RMSE calculations. Therefor, I have excluded films with 3 or less reviews.
 
 INSTRUCTIONS:
 

@@ -1,7 +1,7 @@
 ---
 title: "PH125.9x Data Science Capstone Final Movie Project Report"
 author: "Marina Ganopolsky"
-date: "9/3/2020"
+date: "9/4/2020"
 output: 
   pdf_document: 
     fig_height: 5
@@ -24,16 +24,19 @@ fontsize: 12pt
 editor_options: 
   chunk_output_type: inline
 ---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(comment = NA)
 
-
-
-```{r setup_1,  include=FALSE, cache=TRUE}
-threshold_value <- 0.86490
 ```
 
 
 ```{r, include=FALSE, cache=FALSE, echo=FALSE}
 knitr::read_chunk('final_project.R')
+```
+
+```{r include=FALSE, echo=FALSE}
+threshold_value <- 0.86490
 ```
 
 ```{r, lambda_plot_names, echo=FALSE}
@@ -116,7 +119,7 @@ I will re-iterate that the algorithm development and tuning will be conducted on
 
 As a first step, in order to get some basic information about the data we're working with, we examine the **```movielens```** dataset. The original dataset contains six variables :
 
-* **userID**
+* **userId**
 * **movieId**
 * **rating**
 * **timestamp** 
@@ -125,12 +128,12 @@ As a first step, in order to get some basic information about the data we're wor
 
 After massaging the data a bit, the following fields were added, as derived from the existing fields : 
 
-* **avg_rating** - the mean rating of the film (same value across the same movieId)
+* **avg_rating** - the mean rating of the film (same value across the same ```movieId```)
 * **release_year** - the numeric release year of the film
 * **rating_date** - the date the rating was submitted
-* **age_of_movie** - the age of the film in years (same value for the same movieId)
+* **age_of_movie** - the age of the film in years (same value for the same ```movieId```)
 * **rating_year** - the numeric date the rating was submitted
-* **rating_count** - the cumulative number of ratings submitted for the film (same value across the same movieId)
+* **rating_count** - the cumulative number of ratings submitted for the film (same value across the same ```movieId```)
 
 \pagebreak
 
@@ -154,13 +157,13 @@ data_summary <- movielens %>%
 
 The total of unique movies and users in the movielens subset is **`r format(data_summary$n_users, big.mark = ",")`** unique users and **`r  format(data_summary$n_movies, big.mark = ",")`** different movies:
 
-```{r   echo = FALSE, tidy=TRUE, cache=TRUE}
+```{r   echo=FALSE, tidy=TRUE, cache=TRUE}
 print(data_summary)
 ```
 If every user rated every movie, we would have **`r format(data_summary$n_users * data_summary$n_movies, big.mark = ",")`** rows; however, we only have this many rows:
 
-```{r echo = FALSE}
-nrow(movielens)
+```{r echo=FALSE}
+noquote(format(nrow(movielens), big.mark = ","))
 ```
 Therefor, the database is fairly **sparsely populated**. I will visualize this later in the document.
 \pagebreak
@@ -171,10 +174,11 @@ Therefor, the database is fairly **sparsely populated**. I will visualize this l
 
 ### Sparsity
 
-```{r percent_populated, echo = TRUE} 
+```{r percent_populated, echo=FALSE} 
 percent_populated <- 
   (nrow(movielens)/ (data_summary$n_users* data_summary$n_movies)) * 100
-print(percent_populated)
+percent_populated <- round(percent_populated, 2)
+noquote(paste(percent_populated, "%"))
 ```
 
 As noted, if every user rated every movie, we would have approximately **`r format(data_summary$n_users * data_summary$n_movies, big.mark = ",")`** entries in the dataset; however, as shown above, we only have **`r  format(nrow(movielens), , big.mark = ",")`** ratings. Apparently, the data set is actually less then **`r round(percent_populated, digits=2)`%** populated, which we can see from the calculation above.
@@ -255,9 +259,10 @@ From the data and the bar graph of the ratings, we can make one these conclusion
 \pagebreak
 
 Plotting release year vs. avg movie ratings - it seems that either:\newline
-* Movies are getting worse with time, or 
-* Reviewers are getting pickier with time.
-* More reviews are being submitted with time. 
+
+1. Movies are getting worse with time, or 
+2. Reviewers are getting pickier with time.
+3. More reviews are being submitted with time. 
 
 ```{r  echo=FALSE,  warning=FALSE, message=FALSE}
 movielens %>%
@@ -387,7 +392,7 @@ rmse_results_output_0 %>%  knitr::kable()
 ```
 
 
-As I continue with the project, I will add the results of the RMSE of every model I test to the **```rmse_results```** variable, and print out the table as I have above - so that the data can be reviewed as the project progresses.\newline
+As I continue with the project, I will display results of the RMSE evaluation of every model, and print out the table as I have above - so that the data can be reviewed as the project progresses.\newline
 Taking the average of the existing ratings is a very naive predictor. We can see that the RMSE is > 1.0, which means this isn't a great prediction - as expected. In the rest of the project I will examine several better approaches.
 
 ###  2. Movie effect model
@@ -438,7 +443,7 @@ So far we have been computing estimates with certain levels of uncertainty, but 
 
 Since I am attempting to narrow down a $\lambda$ value quite frequently during this project over various models, I have created a function that will be used to create, calculate, plot, and narrow down the lambda range for each model I attempt to train. 
 
-The function takes in parameters for the start and end of the range of the $\lambda$, an increment to step through the lambda values, as well as another function that is passed in to do the calculations that vary between the models. The function then recursively calls itself only **once** to get and even finer-grained value of  $\lambda$, with a smaller, narrower set of lambdas once a rough range has been established in the first run-through. The function returns a minimum lambda for the model in question; This value, in turn, can then be used to calculate the RMSE for the model. The testing set is very large so if we want to evaluate lambdas somewhat efficiently, we first run the data set with broad intervals, and then zoom in on the best performing section - this is the point of the recursive call of the function below.
+The function takes in parameters for the start and end of the range of the $\lambda$, an increment to step through the  $\lambda$ values, as well as another function that is passed in to do the calculations that vary between the models. The function then recursively calls itself only **once** to get an even finer-grained value of  $\lambda$, with a smaller, narrower set of lambdas once a rough range has been established in the first run-through. The function returns a minimum lambda for the model in question; This value, in turn, can then be used to calculate the RMSE for the model. The testing set is very large so if we want to evaluate lambdas somewhat efficiently, we first run the data set with broad intervals, and then zoom in on the best performing section - this is the point of the recursive call of the function, named ```find_generic_lambda```. The function will also plot the  $\lambda$ vs. RMSE values for both the wide and narrow iteration of the function, choosing the lowest-available value.
 
 **The function will also plot both sets of attempted $\lambda$'s ** - first, the **wide range** that is set by the first call of the function, and then, the **narrowed range** with much more granular steps. Since this function will be called by every regularized model, we will see the $\lambda$ ranges plotted appropriately.
 
@@ -471,11 +476,16 @@ plot_lambdas(1, FALSE)
 ```
 
 ```{r  , echo=FALSE, include=FALSE, results='hide'}
+hash <- archivist::searchInLocalRepo("name:rmse3_lambda")
+archivist::loadFromLocalRepo(hash)
 hash <- archivist::searchInLocalRepo("name:rmse_results_output_3")
 archivist::loadFromLocalRepo(hash)
 hash <- archivist::searchInLocalRepo("name:rmse_3")
 archivist::loadFromLocalRepo(hash)
 ```
+
+The lowest-chosen $\lambda$ value is: **`r rmse3_lambda`** .\newline
+
 
 The function **```regularized_rmse_3```**  was passed as a parameter into the **```find_generic_lambda```** function described above, and will produce the RMSE for the regularized movie effect model. It is of note that the result of this is only slightly better then the non-regularized Movie Effect model (model # 2) and significantly worse then the non-regularized model # 3. Moreover, an RMSE of **`r rmse_3`** is very high, and does not fit the criteria of being **< `r threshold_value`**. Therefor, the search for a fitting RMSE continues.
 
@@ -497,6 +507,8 @@ $$\frac{1}{N} \sum_{u,i} \left(y_{u,i} - \mu - b_i - b_u \right)^2 + \lambda \le
 ```
 
 ```{r , echo=FALSE, include=FALSE, results='hide'}
+hash <- archivist::searchInLocalRepo("name:rmse4_lambda")
+archivist::loadFromLocalRepo(hash)
 hash <- archivist::searchInLocalRepo("name:tmp_rmse_results_4")
 archivist::loadFromLocalRepo(hash)
 hash <- archivist::searchInLocalRepo("name:rmse_4")
@@ -511,7 +523,7 @@ The  $\lambda$'s from this function can be seen here:\newline
 plot_lambdas(2, TRUE)
 plot_lambdas(2, FALSE)
 ```
-
+The lowest-chosen $\lambda$ value is:  **`r rmse4_lambda`** .\newline
 ```{r  echo=FALSE}
 tmp_rmse_results_4 %>%  knitr::kable()
 ```
@@ -539,11 +551,15 @@ plot_lambdas(3, FALSE)
 ```
 
 ```{r , echo=FALSE, include=FALSE, results='hide'}
+hash <- archivist::searchInLocalRepo("name:model_5_lamdba")
+archivist::loadFromLocalRepo(hash)
 hash <- archivist::searchInLocalRepo("name:rmse_results_output_5")
 archivist::loadFromLocalRepo(hash)
 hash <- archivist::searchInLocalRepo("name:model_5_rmse")
 archivist::loadFromLocalRepo(hash)
 ```
+
+The lowest-chosen $\lambda$ value is:  **`r model_5_lamdba`** .\newline
 
 ```{r  echo=FALSE}
 rmse_results_output_5 %>%  knitr::kable()
@@ -572,11 +588,15 @@ plot_lambdas(4, FALSE)
 ```
 
 ```{r, echo=FALSE, include=FALSE, results='hide'}
+hash <- archivist::searchInLocalRepo("name:model_6_lambda")
+archivist::loadFromLocalRepo(hash)
 hash <- archivist::searchInLocalRepo("name:rmse_results_output_6")
 archivist::loadFromLocalRepo(hash)
 hash <- archivist::searchInLocalRepo("name:model_6_rmse")
 archivist::loadFromLocalRepo(hash)
 ```
+
+The lowest-chosen $\lambda$ value is: **`r model_6_lambda`**.\newline
 
 ```{r  echo=FALSE}
 rmse_results_output_6 %>% knitr::kable()
@@ -585,7 +605,7 @@ rmse_results_output_6 %>% knitr::kable()
 \pagebreak
 # Results
 
-After creating a number of predictive algorithms, the best model as per the project requirements is the one with the least RMSE : **'Regularized Movie, User, Release Year and Genre Effect Model'**. Now that we've selected this model, it will be applied to the **validation data set** (which has been untouched as of yet) with the $\lambda$ value we calculated with the last function.
+After creating a number of predictive algorithms, the best model as per the project requirements is the one with the least RMSE : **'Regularized Movie, User, Release Year and Genre Effect Model'** (This is model **#7** from the list enclosed below). Now that we've selected this model, it will be applied to the **validation data set** (which has been untouched as of yet) with the $\lambda$ value we calculated with the last function.
 
 ```{r , echo=FALSE, include=FALSE, results='hide'}
 hash <- archivist::searchInLocalRepo("name:final_rmse")
