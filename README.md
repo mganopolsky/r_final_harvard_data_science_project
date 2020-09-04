@@ -19,5 +19,22 @@ Also remember that by accessing this site, you are agreeing to the terms of the 
 The following code was provided by the staff to serve as a starting point for the project:
 
 The project as a whole had a number of problems with it. 
-* the **archivist** package needs to be installed through devtools::install_github("pbiecek/archivist")
-* the movielens dataset was modified to exclude films that have 3 or less reviews, due to a glitch in the ```createDataPartition {caret} ``` function. As per the documentation of the  function, items with 3 counts or less won't show up in both testing and training data.
+* the **archivist** package needs to be installed through **devtools::install_github("pbiecek/archivist")**
+* the data downloaded and processed by the code will be saved LOCALLY using the **archivist** package, and can be viewd in the same folder
+  - **backpack.db** will hold the database information for the saved objects mentioned above
+  - **gallery/** folder will hold the actual data objects saved by the project.
+  - I am including a version of the **backpack.db** this github project.
+  - Unfortunately, the **gallery** folder was far too large , even in compressed form, to include in GitHub. Therefor, in order to run the .Rmd file and generate the pdf report for the project, **the final_project.R file will HAVE to be executed first**.
+  
+* **the movielens dataset was modified to exclude films that have 3 or less reviews, due to a glitch in the ```createDataPartition {caret} ``` function. As per the documentation of the  function, items in the set with 3 counts or less won't show up in both testing and training data. **
+
+INSTRUCTIONS:
+
+The **final_project.Rmd** file uses the **archivist** package to load the data required to generate **final_project.pdf**. The data is created by the **final_project.R** file.
+
+Therefor, the files have to run in the following order:
+
+1. execute final_project.R
+2. knit final_project.Rmd
+
+with no parameters.
