@@ -75,7 +75,17 @@ movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
                                            genres = as.character(genres)) %>%
   mutate(release_year =  str_extract(title, "(\\(\\d{4}\\)$)") ) %>%
   mutate(release_year = as.numeric(str_remove(str_remove(release_year, "[\\(]"), "[\\)]")) ,
-         title = str_trim(str_remove(title, "\\(\\d{4}\\)$")))
+         title = str_trim(str_remove(title, "\\(\\d{4}\\)$"))) 
+  
+
+
+genre_list <- movies %>% mutate(genre_list = strsplit(genres, "|", fixed = TRUE)) %>%
+  mutate(genre_count = sapply(genre_list, "length" )) %>%
+  mutate(genre_list = sapply(genre_list, "unlist")) %>%
+  mutate(genre_list = sapply(genre_list, "sort")) %>%
+  distinct(genre_count, genre_list)
+
+archivist::saveToLocalRepo(genre_list, repoDir = repo)
 
 #add in ratings average and ratings_count per movie, into the dataset
 rating_avgs <- ratings %>% group_by(movieId) %>% summarise(avg_rating = mean(rating), rating_count = n())
@@ -150,8 +160,8 @@ users %>%
   scale_x_log10() + xlab("Long 10 User Count") +
   ggtitle("Users log10 Density Distribution")
 
-## ---- users_4_graphs --------
 #Variability in all reviews 
+## ---- users_4_graphs --------
 gu_1 <- users %>%
   ggplot(aes(n, avg_user_rating)) + 
   geom_point(color="blue", alpha=.3) + 
@@ -191,8 +201,17 @@ plot_grid(gu_1, gu_2, gu_3, gu_4)
 movielens %>%  group_by(movieId) %>% summarise(n = n()) %>%
   ggplot(aes(n)) + 
   geom_histogram(fill = "blue", color="black", bins = 40) +
-  scale_x_log10() + xlab("Log10 Rating Count Per Movie") +
-  ggtitle("Movie Ratings With log10 Density Distribution")
+  scale_x_log10() + xlab("Log10 Rating Count Bins") + 
+  ylab("Frequency") +
+  ggtitle("Cumulative Movie Ratings Histogram : log10 Cumulative Ratings vs Frequency")
+
+
+## ---- movie_releases_over_the_yeears --------
+movielens %>% 
+  ggplot(aes(release_year)) + 
+  geom_histogram(binwidth = 1, fill = "blue", color="black") +
+  ylab("Movies Released") + xlab("Release Year") + 
+  ggtitle("Release Year vs Movies")
 
 
 ## ---- ratings_4_graphs_preface --------
@@ -368,18 +387,19 @@ saveToLocalRepo(test_set, repoDir = repo)
 mu_hat <- mean(train_set$rating)
 mu_hat
 
-#we will run the RMSE algorithm on the test set, and compare it with the mean of the ratings. This is the most basic of predictions, and will give us a baseline to beat.
+#we will run the RMSE algorithm on the test set, and compare it with the mean of the ratings. 
+#This is the most basic of predictions, and will give us a baseline to beat.
 naive_rmse <- RMSE(test_set$rating, mu_hat)
 naive_rmse
 
 saveToLocalRepo(naive_rmse, repoDir = repo)
 
 #adding the basic results to the output table; first try
-rmse_results <- tibble(method = "Just the average", RMSE = naive_rmse)
+rmse_results <- tibble(method = "Just the average", RMSE = naive_rmse) 
 
 
 ## ---- naive_rmse_printout --------
-rmse_results_output_0 <- rmse_results %>% knitr::kable(row.names=TRUE)
+rmse_results_output_0 <- rmse_results 
 rmse_results_output_0
 saveToLocalRepo(rmse_results_output_0, repoDir = repo)
 
@@ -406,7 +426,7 @@ predicted_ratings <- mu + test_set %>%
 model_1_rmse <- RMSE(test_set$rating, predicted_ratings)
 saveToLocalRepo(model_1_rmse, repoDir = repo)
 #get the RMSE results from from the b_i predective model
-rmse_results_output_1 <- tibble(method = "Just Movie Effect Model b_i average", RMSE = model_1_rmse)
+rmse_results_output_1 <- tibble(method = "Just Movie Effect Model b_i average", RMSE = model_1_rmse) 
 saveToLocalRepo(rmse_results_output_1, repoDir = repo)
 #add to existing rmse results table
 rmse_results <- bind_rows(rmse_results, rmse_results_output_1)
@@ -428,7 +448,7 @@ predicted_ratings <- test_set %>%
 
 model_2_rmse <- RMSE(predicted_ratings, test_set$rating)
 saveToLocalRepo(model_2_rmse, repoDir = repo)
-rmse_results_output_2 <- tibble(method = "User Affect + Movie Effect Model", RMSE = model_2_rmse)
+rmse_results_output_2 <- tibble(method = "User Affect + Movie Effect Model", RMSE = model_2_rmse) 
 saveToLocalRepo(rmse_results_output_2, repoDir = repo)
 #add to existing rmse results table
 rmse_results <- bind_rows(rmse_results, rmse_results_output_2)
@@ -449,6 +469,33 @@ rmse_results %>% knitr::kable(row.names=TRUE)
 #The function is meant to be called exactly twice - once to find the rough range of the lambda, and once again to find a more granular detailed lambda.
 #The recursive call is set up in order to optimize performance - if we were to run the algorithm with the final granularity, it will be an order of magnitude slower.
 
+## ---- lambda_plot_names --------
+prefix <- "Narrowed :"
+lambda_plot_names <- c("Testing Lambdas for Movie Affect",
+                       "Testing Lambdas for Movie Affect and User Bias Effect", 
+                       "Testing Lambdas for Movie Affect, User Bias Effect and Film Age Affect", 
+                       "Testing Lambdas for Movie Affect, User Bias , Film Age And Genre Effect")
+
+get_narrowed_plot_name <- function(plot_title)
+{
+  title <- paste(prefix, plot_title, sep = " ")
+  return(title)
+}
+
+#plot_lambdas will find the lambda plots saved in memory by the find_generic_lambda 
+#function below, and using the info above will find the plot in the local repository and 
+#print it
+plot_lambdas <- function(regularized_model_index, wide_flag = TRUE)
+{
+  plot_title <- lambda_plot_names[regularized_model_index]
+  if (!wide_flag) {
+    plot_title <- get_narrowed_plot_name(plot_title)
+  }
+  hash <- archivist::searchInLocalRepo(plot_title)
+  plot <- loadFromLocalRepo(hash, value = TRUE)
+  print(plot)
+}
+
 ## ---- find_generic_lambda --------
 find_generic_lambda <- function(seq_start, seq_end, seq_increment, FUN, 
         detailed_flag = FALSE, training_set, testing_set, plot_title="")
@@ -457,7 +504,7 @@ find_generic_lambda <- function(seq_start, seq_end, seq_increment, FUN,
   #calculate the RMSEs for the FUN - regularized function passed in - 
     #with the lambda range created above
   RMSE <- sapply(lambdas, FUN)
-  print(RMSE)
+  #print(RMSE)
   #plot the output to see the smallest lamdba
   plot <- qplot(lambdas, RMSE, main=plot_title)
   print(plot)
@@ -476,7 +523,8 @@ find_generic_lambda <- function(seq_start, seq_end, seq_increment, FUN,
      seq_end = min_lambda_first_try + new_lambda_range, 
      seq_increment = seq_increment/10, FUN, detailed_flag = FALSE, 
       training_set = training_set,  testing_set = testing_set, 
-     plot_title=paste("Narrowed :" , plot_title, sep=" "))
+     plot_title=
+       get_narrowed_plot_name(plot_title))
   }
   return (min_lambda_first_try)
 }
@@ -501,7 +549,6 @@ regularized_rmse_3 <- function(l, training_set, testing_set)
     pull(pred)
   
   l_rmse <- RMSE(predicted_ratings, testing_set$rating)
-  #print(l_rmse)
   return (l_rmse)
 }
 
@@ -511,12 +558,12 @@ rmse3_lambda <- find_generic_lambda(seq_start=0, seq_end=10, seq_increment=0.5,
                                     FUN= function(x) regularized_rmse_3(x, train_set, test_set ), 
                                     detailed_flag = TRUE, training_set=train_set, 
                                     testing_set=test_set, 
-                                    plot_title = "Testing Lambdas for Movie Affect")
+                                    plot_title = lambda_plot_names[1])
 saveToLocalRepo(rmse3_lambda, repoDir = repo)
 rmse_3 <- regularized_rmse_3(rmse3_lambda, train_set, test_set)
 saveToLocalRepo(rmse_3, repoDir = repo)
 
-rmse_results_output_3 <- tibble(method = "Regularized + Movie Effect", RMSE = rmse_3)
+rmse_results_output_3 <- tibble(method = "Regularized + Movie Effect", RMSE = rmse_3) 
 saveToLocalRepo(rmse_results_output_3, repoDir = repo)
 
 #add to existing rmse results table
@@ -554,7 +601,6 @@ regularized_movie_and_user <- function(l, training_set, testing_set)
     pull(pred)
   
   return(RMSE(predicted_ratings, testing_set$rating))
-  
 }
 
 ## ---- regularized_movie_and_user_evals --------
@@ -563,7 +609,7 @@ rmse4_lambda <- find_generic_lambda(seq_start=0, seq_end=10, seq_increment=0.5,
             FUN= function(x)  
               regularized_movie_and_user(x, training_set=train_set, testing_set=test_set ), 
             detailed_flag = TRUE, training_set=train_set, testing_set=test_set, 
-            plot_title = "Testing Lambdas for Movie Affect and User Bias Effect")
+            plot_title = lambda_plot_names[2])
 saveToLocalRepo(rmse4_lambda, repoDir = repo)
 rmse_4 <- regularized_movie_and_user(rmse4_lambda, train_set, test_set)
 saveToLocalRepo(rmse_4, repoDir = repo)
@@ -619,7 +665,7 @@ model_5_lamdba <- find_generic_lambda(seq_start=0, seq_end=10, seq_increment=0.5
                       training_set=train_set, testing_set=test_set ), 
                       detailed_flag = TRUE, training_set=train_set, 
                       testing_set=test_set, plot_title = 
-                        "Testing Lambdas for Movie Affect, User Bias Effect and Film Age Affect")
+                        lambda_plot_names[3])
 saveToLocalRepo(model_5_lamdba, repoDir = repo)
 model_5_rmse <- regularized_movie_and_user_and_year(model_5_lamdba, train_set, test_set)
 saveToLocalRepo(model_5_rmse, repoDir = repo)
@@ -683,11 +729,12 @@ model_6_lambda <- find_generic_lambda(seq_start=0, seq_end=10, seq_increment=0.5
           FUN= function(x) regularized_movie_and_user_and_year_and_genre(x, 
           training_set=train_set, testing_set=test_set ), 
           detailed_flag = TRUE, training_set=train_set, testing_set=test_set, 
-          plot_title = "Testing Lambdas for Movie Affect, User Bias , Film Age And Genre Effect")
+          plot_title = lambda_plot_names[4])
 saveToLocalRepo(model_6_lambda, repoDir = repo)
 model_6_rmse <- regularized_movie_and_user_and_year_and_genre(model_6_lambda, train_set, test_set)
 saveToLocalRepo(model_6_rmse, repoDir = repo)
-rmse_results_output_6 <- tibble(method = "Regularized Movie + User Effect Model + Year Effect Model + Genre Effect Model", RMSE = model_6_rmse)
+rmse_results_output_6 <- 
+  tibble(method = "Regularized Movie + User Effect Model + Year Effect Model + Genre Effect Model", RMSE = model_6_rmse) 
 saveToLocalRepo(rmse_results_output_6, repoDir = repo)
 #add to existing rmse results table
 rmse_results <- bind_rows(rmse_results, rmse_results_output_6)
@@ -700,7 +747,7 @@ final_rmse <- regularized_movie_and_user_and_year_and_genre(model_6_lambda,
 saveToLocalRepo(final_rmse, repoDir = repo)
 
 
-final_rmse_results <- tibble(method = "Final Model Tested on Validation Set", RMSE = final_rmse)
+final_rmse_results <- tibble(method = "Final Model Tested on Validation Set", RMSE = final_rmse) 
 saveToLocalRepo(final_rmse_results, repoDir = repo)
 
 #add to existing rmse results table
